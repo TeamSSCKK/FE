@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/shared/ui/button";
 
@@ -13,8 +14,8 @@ export function HomeView() {
         className="pointer-events-none absolute -left-32 top-1/2 h-64 w-64 rounded-full bg-primary/[0.06] blur-3xl"
       />
 
-      <div className="relative flex-1 px-5">
-        <div className="mt-24">
+      <div className="relative flex flex-1 flex-col px-5">
+        <div className="mt-20">
           <h1 className="animate-fade-up text-[30px] font-bold leading-tight tracking-tight">
             친구들과의 모임,
             <br />
@@ -28,6 +29,20 @@ export function HomeView() {
             <br />
             손쉽게 정해보세요.
           </p>
+        </div>
+
+        <div
+          className="flex flex-1 animate-fade-up items-start justify-center pt-16"
+          style={{ animationDelay: "200ms" }}
+        >
+          <Image
+            src="/resource/main-people.png"
+            alt="친구들과 함께하는 모임"
+            width={2816}
+            height={1536}
+            priority
+            className="h-auto w-full max-w-[352px]"
+          />
         </div>
       </div>
 
