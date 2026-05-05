@@ -1,0 +1,37 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "plugins": ["boundaries"],
+  "settings": {
+    "import/resolver": {
+      "node": { "extensions": [".js", ".jsx", ".ts", ".tsx"] },
+      "typescript": { "alwaysTryTypes": true }
+    },
+    "boundaries/include": ["src/**/*"],
+    "boundaries/elements": [
+      { "type": "app",      "pattern": "src/app/**/*" },
+      { "type": "views",    "pattern": "src/views/*",    "mode": "folder" },
+      { "type": "widgets",  "pattern": "src/widgets/*",  "mode": "folder" },
+      { "type": "features", "pattern": "src/features/*", "mode": "folder" },
+      { "type": "entities", "pattern": "src/entities/*", "mode": "folder" },
+      { "type": "shared",   "pattern": "src/shared/**/*" }
+    ]
+  },
+  "rules": {
+    "boundaries/no-unknown": "error",
+    "boundaries/no-unknown-files": "off",
+    "boundaries/element-types": [
+      "error",
+      {
+        "default": "disallow",
+        "rules": [
+          { "from": ["app"],      "allow": ["views", "widgets", "features", "entities", "shared"] },
+          { "from": ["views"],    "allow": ["widgets", "features", "entities", "shared"] },
+          { "from": ["widgets"],  "allow": ["features", "entities", "shared"] },
+          { "from": ["features"], "allow": ["entities", "shared"] },
+          { "from": ["entities"], "allow": ["shared"] },
+          { "from": ["shared"],   "allow": ["shared"] }
+        ]
+      }
+    ]
+  }
+}
