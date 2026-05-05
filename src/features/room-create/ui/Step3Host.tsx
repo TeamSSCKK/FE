@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { useRoomCreateStore } from "../model/store";
 import { isValidHost, isValidPassword } from "../model/validation";
 import { ClearButton } from "./ClearButton";
+import { SoftInput } from "./SoftInput";
 import { StepShell } from "./StepShell";
 import { ValidationAlert } from "./ValidationAlert";
 
@@ -18,6 +18,7 @@ export function Step3Host() {
   const password = useRoomCreateStore((s) => s.password);
   const setHostName = useRoomCreateStore((s) => s.setHostName);
   const setPassword = useRoomCreateStore((s) => s.setPassword);
+  const goToStep = useRoomCreateStore((s) => s.goToStep);
   const submit = useRoomCreateStore((s) => s.submit);
   const isSubmitting = useRoomCreateStore((s) => s.isSubmitting);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -37,31 +38,37 @@ export function Step3Host() {
   return (
     <>
       <StepShell
-        aboveCard={<span>{name}</span>}
+        onBack={() => goToStep(2)}
+        currentStep={3}
+        aboveContent={
+          <span>
+            {name}
+            <span className="ml-2 text-muted-foreground">
+              · {formatKoreanDateTime(dateTime)}
+            </span>
+          </span>
+        }
         footer={
           <Button
             onClick={handleSubmit}
-            className="rounded-full px-5"
-            size="sm"
             disabled={isSubmitting}
+            className="h-14 w-full rounded-2xl text-base font-semibold transition-all duration-200 active:scale-[0.98] active:opacity-95 disabled:opacity-60"
           >
             {isSubmitting ? "생성 중..." : "다음"}
           </Button>
         }
       >
-        <p className="text-sm text-muted-foreground">
-          {formatKoreanDateTime(dateTime)}
-        </p>
-
         <div className="space-y-2">
-          <Label htmlFor="host-name">주최자 정보</Label>
+          <Label htmlFor="host-name" className="text-sm text-muted-foreground">
+            주최자 이름
+          </Label>
           <div className="relative">
-            <Input
+            <SoftInput
               id="host-name"
               value={hostName}
               onChange={(e) => setHostName(e.target.value)}
-              placeholder="이름을 입력하세요."
-              className="bg-background pr-10"
+              placeholder="이름을 입력하세요"
+              className="pr-11"
               maxLength={20}
             />
             {hostName && <ClearButton onClick={() => setHostName("")} />}
@@ -69,15 +76,20 @@ export function Step3Host() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="host-password">비밀번호</Label>
+          <Label
+            htmlFor="host-password"
+            className="text-sm text-muted-foreground"
+          >
+            비밀번호
+          </Label>
           <div className="relative">
-            <Input
+            <SoftInput
               id="host-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력하세요."
-              className="bg-background pr-10"
+              placeholder="4자 이상 입력하세요"
+              className="pr-11"
               maxLength={20}
             />
             {password && <ClearButton onClick={() => setPassword("")} />}

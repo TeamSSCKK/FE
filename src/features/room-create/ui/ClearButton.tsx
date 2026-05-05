@@ -15,11 +15,11 @@ export function ClearButton({ onClick, className }: Props) {
       aria-label="입력 지우기"
       onClick={onClick}
       className={cn(
-        "absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground",
+        "absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-foreground/10 text-foreground/60 transition-all duration-150 hover:bg-foreground/15 hover:text-foreground active:scale-90",
         className,
       )}
     >
-      <X className="h-4 w-4" strokeWidth={2.5} />
+      <X className="h-3.5 w-3.5" strokeWidth={2.75} />
     </button>
   );
 }

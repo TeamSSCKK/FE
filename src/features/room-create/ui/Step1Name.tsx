@@ -1,17 +1,18 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/shared/ui/button";
-import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { useRoomCreateStore } from "../model/store";
 import { isValidName } from "../model/validation";
 import { ClearButton } from "./ClearButton";
+import { SoftInput } from "./SoftInput";
 import { StepShell } from "./StepShell";
 import { ValidationAlert } from "./ValidationAlert";
 
 export function Step1Name() {
+  const router = useRouter();
   const name = useRoomCreateStore((s) => s.name);
   const setName = useRoomCreateStore((s) => s.setName);
   const goToStep = useRoomCreateStore((s) => s.goToStep);
@@ -28,24 +29,29 @@ export function Step1Name() {
   return (
     <>
       <StepShell
-        aboveCard={<span>모임 생성을 해보세요.</span>}
-        footerAlign="center"
+        onBack={() => router.push("/")}
+        currentStep={1}
+        aboveContent="어떤 모임이에요?"
         footer={
-          <Button onClick={handleSubmit} className="rounded-full px-6">
-            <Sparkles className="mr-1.5 h-4 w-4" />
+          <Button
+            onClick={handleSubmit}
+            className="h-14 w-full rounded-2xl text-base font-semibold transition-all duration-200 active:scale-[0.98] active:opacity-95"
+          >
             모임 생성하기
           </Button>
         }
       >
         <div className="space-y-2">
-          <Label htmlFor="room-name">모임 이름</Label>
+          <Label htmlFor="room-name" className="text-sm text-muted-foreground">
+            모임 이름
+          </Label>
           <div className="relative">
-            <Input
+            <SoftInput
               id="room-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="정아의 생일파티"
-              className="bg-background pr-10"
+              placeholder="예: 정아의 생일파티"
+              className="pr-11"
               maxLength={30}
             />
             {name && <ClearButton onClick={() => setName("")} />}

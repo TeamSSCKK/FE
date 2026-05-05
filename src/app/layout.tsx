@@ -18,8 +18,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
-      <body className="bg-neutral-100 antialiased">
-        {/* Mobile-first: 기본은 화면 가득, 데스크탑에서는 max-w-md로 중앙 고정 (인스타 웹 스타일) */}
+      <head>
+        <link
+          rel="stylesheet"
+          as="style"
+          // eslint-disable-next-line @next/next/no-page-custom-font
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
+      </head>
+      <body className="bg-neutral-100 font-sans antialiased">
         <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background shadow-sm">
           {children}
         </div>
