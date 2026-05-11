@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { useRoomCreateStore } from "../model/store";
 import { isValidName } from "../model/validation";
-import { ClearButton } from "./ClearButton";
+import { ClearButton } from "@/shared/ui/clear-button";
 import { SoftInput } from "./SoftInput";
 import { StepShell } from "./StepShell";
 import { ValidationAlert } from "./ValidationAlert";
