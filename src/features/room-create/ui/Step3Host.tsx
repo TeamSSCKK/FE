@@ -6,7 +6,7 @@ import { Label } from "@/shared/ui/label";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { useRoomCreateStore } from "../model/store";
 import { isValidHost, isValidPassword } from "../model/validation";
-import { ClearButton } from "./ClearButton";
+import { ClearButton } from "@/shared/ui/clear-button";
 import { SoftInput } from "./SoftInput";
 import { StepShell } from "./StepShell";
 import { ValidationAlert } from "./ValidationAlert";

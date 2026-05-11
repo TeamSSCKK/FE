@@ -1,9 +1,11 @@
 import { RoomDetailView } from "@/views/room-detail";
 
-interface Props {
-  params: { code: string };
+interface PageProps {
+  params: {
+    code: string;
+  };
 }
 
-export default function Page({ params }: Props) {
-  return <RoomDetailView code={decodeURIComponent(params.code)} />;
+export default function Page({ params }: PageProps) {
+  return <RoomDetailView roomCode={decodeURIComponent(params.code)} />;
 }

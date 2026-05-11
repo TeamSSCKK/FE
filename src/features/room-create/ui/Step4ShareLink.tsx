@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { TopBar } from "@/shared/ui/top-bar";
 import { shareLink } from "@/shared/lib/share";
+import { saveMemberId } from "@/shared/lib/room-session";
 import { useRoomCreateStore } from "../model/store";
 
 export function Step4ShareLink() {
@@ -28,6 +29,7 @@ export function Step4ShareLink() {
   };
 
   const handleGoToRoom = () => {
+    saveMemberId(roomCode, "host_" + roomCode); // TODO: 실제 API 연동 후 hostMemberId로 교체
     router.push(`/rooms/${encodeURIComponent(roomCode)}`);
   };
 
