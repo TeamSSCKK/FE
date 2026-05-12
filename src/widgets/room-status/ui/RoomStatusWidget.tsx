@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Share2,
   CheckCircle2,
@@ -90,6 +91,7 @@ function MemberRow({
 
 /** 메인 뷰 */
 export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
+  const router = useRouter();
   const [roomStatus, setRoomStatus] = useState<RoomStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [localMemberId, setLocalMemberId] = useState(currentMemberId);
@@ -280,8 +282,8 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
           </p>
           {mode === "member" ? (
             <div className="mt-4 space-y-2">
-              <Button 
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+              <Button
+                onClick={() => router.push(`/rooms/${roomCode}/location`)}
                 className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 위치 입력하기
@@ -303,8 +305,8 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
             </div>
           ) : (
             <div className="mt-4 flex gap-2">
-              <Button 
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+              <Button
+                onClick={() => router.push(`/rooms/${roomCode}/location`)}
                 className="flex-1 rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 위치 및 취향 수정하기

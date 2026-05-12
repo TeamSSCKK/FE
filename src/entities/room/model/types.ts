@@ -21,6 +21,22 @@ export interface Room {
 }
 
 /**
+ * 출발지(좌표 + 주소) 정보
+ */
+export interface Location {
+  /** 표시용 장소명 (예: "강남역", "중앙대학교") */
+  label: string;
+  /** 도로명 주소 */
+  roadAddress: string;
+  /** 지번 주소 (옵션) */
+  jibunAddress?: string;
+  /** 위도 */
+  lat: number;
+  /** 경도 */
+  lng: number;
+}
+
+/**
  * 방 멤버 정보
  */
 export interface Member {
@@ -36,8 +52,10 @@ export interface Member {
   hasPreference: boolean;
   /** 투표 완료 여부 */
   hasVoted: boolean;
-  /** 출발지 표시용 위치 라벨 (예: "강남역") */
+  /** @deprecated `location.label` 사용 — 호환을 위해 임시 유지 */
   locationLabel?: string;
+  /** 본인이 입력한 출발지 (좌표 + 주소) */
+  location?: Location;
 }
 
 /**
