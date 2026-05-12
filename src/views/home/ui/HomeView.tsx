@@ -46,7 +46,14 @@ export function HomeView() {
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 animate-fade-up bg-background/85 px-5 pb-6 pt-4 backdrop-blur-md">
+      <div className="sticky bottom-0 z-10 flex animate-fade-up flex-col gap-2 bg-background/85 px-5 pb-6 pt-4 backdrop-blur-md">
+        <Button
+          asChild
+          variant="secondary"
+          className="h-14 w-full rounded-2xl bg-neutral-200 text-base font-semibold text-foreground transition-all duration-200 hover:bg-neutral-300 active:scale-[0.98] active:opacity-95"
+        >
+          <Link href="/rooms/mine">내 모임 보기</Link>
+        </Button>
         <Button
           asChild
           className="h-14 w-full rounded-2xl text-base font-semibold transition-all duration-200 active:scale-[0.98] active:opacity-95"
