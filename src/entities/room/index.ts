@@ -1,5 +1,10 @@
 export { createRoom } from "./api/create-room";
-export { fetchRoomStatus, joinRoom, deleteMember } from "./api/fetch-room-status";
+export {
+  fetchRoomStatus,
+  joinRoom,
+  deleteMember,
+  updateMemberLocation,
+} from "./api/fetch-room-status";
 export type {
   Room,
   RoomCode,
@@ -7,4 +12,5 @@ export type {
   CreateRoomResult,
   Member,
   RoomStatus,
+  Location,
 } from "./model/types";

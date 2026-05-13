@@ -1,5 +1,5 @@
 
-import type { RoomStatus, Member } from "../model/types";
+import type { RoomStatus, Member, Location } from "../model/types";
 
 // TODO: apiClient 교체
 // Mock in-memory store for members per room
@@ -108,4 +108,24 @@ export async function deleteMember(params: {
       members.splice(index, 1);
     }
   }
+}
+
+export async function updateMemberLocation(params: {
+  code: string;
+  memberId: string;
+  location: Location;
+}): Promise<Member> {
+  // TODO: apiClient 교체
+  await new Promise((r) => setTimeout(r, 350));
+
+  const members = mockMemberStore.get(params.code);
+  if (!members) throw new Error("Room not found");
+  const target = members.find((m) => m.id === params.memberId);
+  if (!target) throw new Error("Member not found");
+
+  target.location = params.location;
+  target.locationLabel = params.location.label;
+  target.hasLocation = true;
+
+  return target;
 }
