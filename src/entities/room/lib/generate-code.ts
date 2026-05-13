@@ -7,5 +7,5 @@ export function generateRoomCode(): string {
   const right = Array.from({ length: 6 }, () =>
     Math.floor(Math.random() * 10).toString(),
   ).join("");
-  return `${left}/${right}`;
+  return `${left}-${right}`;
 }
