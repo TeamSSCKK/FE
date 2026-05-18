@@ -36,6 +36,7 @@ export function RoomLocationView({ roomCode }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const mode = useLocationInputStore((s) => s.mode);
   const selected = useLocationInputStore((s) => s.selected);
@@ -43,7 +44,6 @@ export function RoomLocationView({ roomCode }: Props) {
   const clearResults = useLocationInputStore((s) => s.clearResults);
   const isSubmitting = useLocationInputStore((s) => s.isSubmitting);
   const setIsSubmitting = useLocationInputStore((s) => s.setIsSubmitting);
-  const setError = useLocationInputStore((s) => s.setError);
   const reset = useLocationInputStore((s) => s.reset);
 
   useEffect(() => {
@@ -59,13 +59,17 @@ export function RoomLocationView({ roomCode }: Props) {
         if (canceled) return;
         setRoom(status.room);
 
+        // sessionStorage의 id를 그대로 믿지 않고 실제 멤버 목록과 대조한다.
+        // mockMemberStore(모듈 레벨 Map)는 새로고침 시 리셋되어 host id가 새로
+        // 발급되므로, 옛 id가 sessionStorage에 남아 있으면 제출 시 멤버를 못 찾는다.
         const existingId = loadMemberId(roomCode);
-        if (existingId) {
+        if (existingId && status.members.some((m) => m.id === existingId)) {
           setMemberId(existingId);
           return;
         }
 
-        // host 임시 흡수: localStorage에 room-{code}가 있다면 이 단말이 방 생성자
+        // sessionStorage가 없거나 stale → host 재흡수.
+        // localStorage에 room-{code}가 있다면 이 단말이 방 생성자
         const stored = localStorage.getItem(`room-${roomCode}`);
         if (stored) {
           const host = status.members.find((m) => m.isHost);
@@ -189,7 +193,7 @@ export function RoomLocationView({ roomCode }: Props) {
   const handleSubmit = useCallback(async () => {
     if (!selected || !memberId) return;
     setIsSubmitting(true);
-    setError(null);
+    setSubmitError(null);
     try {
       const location: Location = {
         label: selected.label,
@@ -200,11 +204,12 @@ export function RoomLocationView({ roomCode }: Props) {
       };
       await updateMemberLocation({ code: roomCode, memberId, location });
       router.push(`/rooms/${roomCode}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "저장 실패");
+    } catch {
+      // mock 계층의 raw 메시지(영문) 대신 사용자용 한국어 메시지로 통일
+      setSubmitError("위치 저장에 실패했어요. 잠시 후 다시 시도해주세요.");
       setIsSubmitting(false);
     }
-  }, [selected, memberId, roomCode, router, setIsSubmitting, setError]);
+  }, [selected, memberId, roomCode, router, setIsSubmitting]);
 
   if (loadError) {
     return (
@@ -292,6 +297,11 @@ export function RoomLocationView({ roomCode }: Props) {
         {isSubmitting && (
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
             저장 중...
+          </p>
+        )}
+        {submitError && (
+          <p className="mt-2 text-center text-[12px] text-destructive">
+            {submitError}
           </p>
         )}
       </div>
