@@ -15,7 +15,8 @@ export function loadNaverMapScript(clientId: string): Promise<void> {
 
   loaderPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(clientId)}&submodules=geocoder`;
+    // 2025년 인증 파라미터 통합: ncpClientId → ncpKeyId
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(clientId)}&submodules=geocoder`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {

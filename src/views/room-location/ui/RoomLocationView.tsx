@@ -17,6 +17,7 @@ import {
   AddressSearchOverlay,
   SelectedLocationCard,
   SubmitButton,
+  CurrentLocationButton,
   useLocationInputStore,
   getCurrentPosition,
   type PlaceSearchItem,
@@ -34,10 +35,12 @@ export function RoomLocationView({ roomCode }: Props) {
   const [room, setRoom] = useState<Room | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const mode = useLocationInputStore((s) => s.mode);
   const selected = useLocationInputStore((s) => s.selected);
   const setSelected = useLocationInputStore((s) => s.setSelected);
+  const clearResults = useLocationInputStore((s) => s.clearResults);
   const isSubmitting = useLocationInputStore((s) => s.isSubmitting);
   const setIsSubmitting = useLocationInputStore((s) => s.setIsSubmitting);
   const setError = useLocationInputStore((s) => s.setError);
@@ -154,9 +157,34 @@ export function RoomLocationView({ roomCode }: Props) {
         roadAddress: item.roadAddress,
         jibunAddress: item.address,
       });
+      // 결과 리스트만 닫아 지도/핀이 드러나게 한다.
+      // query는 유지 — 검색바 검색어가 남고 재검색이 자동 트리거되지 않는다.
+      clearResults();
     },
-    [setSelected],
+    [setSelected, clearResults],
   );
+
+  // 현재 위치 버튼: 자동 GPS와 달리 실패 시 fallback 없이 사용자에게 알린다.
+  const handleLocateCurrentPosition = useCallback(async () => {
+    setIsLocating(true);
+    try {
+      const coords = await getCurrentPosition();
+      let roadAddress = "";
+      let jibunAddress = "";
+      try {
+        const r = await reverseGeocode(coords);
+        roadAddress = r.roadAddress;
+        jibunAddress = r.jibunAddress;
+      } catch {
+        // 주소를 못 얻어도 좌표는 유효 — 핀은 찍는다
+      }
+      setSelected({ label: "현재 위치", coords, roadAddress, jibunAddress });
+    } catch {
+      alert("현재 위치를 가져올 수 없어요. 브라우저의 위치 권한을 확인해주세요.");
+    } finally {
+      setIsLocating(false);
+    }
+  }, [setSelected]);
 
   const handleSubmit = useCallback(async () => {
     if (!selected || !memberId) return;
@@ -199,7 +227,7 @@ export function RoomLocationView({ roomCode }: Props) {
   const markerLabel = selected?.label;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex h-dvh flex-col bg-background">
       {/* 헤더 */}
       <header className="flex items-center gap-2 border-b border-border/30 px-2 py-2">
         <button
@@ -234,7 +262,7 @@ export function RoomLocationView({ roomCode }: Props) {
       </div>
 
       {/* 지도 + (검색 모드 시) 검색 오버레이 */}
-      <div className="relative mx-5 mt-3 flex-1 overflow-hidden rounded-2xl bg-neutral-100">
+      <div className="relative mx-5 mt-3 min-h-[200px] flex-1 overflow-hidden rounded-2xl bg-neutral-100">
         <NaverMap
           center={center}
           marker={marker}
@@ -246,6 +274,11 @@ export function RoomLocationView({ roomCode }: Props) {
         {mode === "search" && (
           <AddressSearchOverlay onPick={handlePickFromSearch} />
         )}
+        <CurrentLocationButton
+          onClick={handleLocateCurrentPosition}
+          isLocating={isLocating}
+          className="absolute bottom-3 right-3 z-10"
+        />
       </div>
 
       {/* 선택한 위치 카드 */}
