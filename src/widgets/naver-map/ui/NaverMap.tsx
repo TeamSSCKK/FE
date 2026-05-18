@@ -31,21 +31,35 @@ export function NaverMap({
 
   useEffect(() => {
     let canceled = false;
+    let resizeObserver: ResizeObserver | null = null;
+
     loadNaverMapScript(env.NAVER_MAP_CLIENT_ID)
       .then(() => {
         if (canceled || !containerRef.current) return;
         const { naver } = window;
-        mapRef.current = new naver.maps.Map(containerRef.current, {
+        const map = new naver.maps.Map(containerRef.current, {
           center: new naver.maps.LatLng(center.lat, center.lng),
           zoom: 16,
           minZoom: 9,
           zoomControl: false,
           mapDataControl: false,
           scaleControl: false,
+          // 네이버 로고는 약관상 제거 불가 — 위치만 좌측 하단으로 이동
           logoControl: true,
+          logoControlOptions: {
+            position: naver.maps.Position.BOTTOM_LEFT,
+          },
         });
+        mapRef.current = map;
         setIsReady(true);
         onReadyRef.current?.();
+
+        // 컨테이너 크기가 0→실제값으로 잡히는 첫 렌더 타이밍 보정.
+        // ResizeObserver는 observe 직후 1회 즉시 콜백하므로 초기 타일 로드도 보장된다.
+        resizeObserver = new ResizeObserver(() => {
+          naver.maps.Event.trigger(map, "resize");
+        });
+        resizeObserver.observe(containerRef.current);
       })
       .catch((err) => {
         if (!canceled) setLoadError(err.message ?? "지도 로드 실패");
@@ -53,6 +67,7 @@ export function NaverMap({
 
     return () => {
       canceled = true;
+      resizeObserver?.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -176,7 +191,12 @@ export function NaverMap({
     );
   }
 
-  return <div ref={containerRef} className={cn("h-full w-full", className)} />;
+  return (
+    <div
+      ref={containerRef}
+      className={cn("naver-map h-full w-full", className)}
+    />
+  );
 }
 
 function escapeHtml(s: string): string {

@@ -19,6 +19,7 @@ interface LocationInputState {
   setQuery: (query: string) => void;
   setIsSubmitting: (v: boolean) => void;
   setError: (msg: string | null) => void;
+  clearResults: () => void;
   runSearch: () => Promise<void>;
   reset: () => void;
 }
@@ -36,6 +37,7 @@ export const useLocationInputStore = create<LocationInputState>((set, get) => ({
   setQuery: (query) => set({ query }),
   setIsSubmitting: (v) => set({ isSubmitting: v }),
   setError: (msg) => set({ error: msg }),
+  clearResults: () => set({ results: [] }),
   runSearch: async () => {
     const q = get().query.trim();
     if (!q) {
