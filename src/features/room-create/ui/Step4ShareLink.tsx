@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 import { TopBar } from "@/shared/ui/top-bar";
 import { shareLink } from "@/shared/lib/share";
 import { saveMemberId } from "@/shared/lib/room-session";
+import { fetchRoomStatus } from "@/entities/room";
 import { useRoomCreateStore } from "../model/store";
 
 export function Step4ShareLink() {
@@ -28,8 +29,14 @@ export function Step4ShareLink() {
     else setShareStatus("공유에 실패했어요. 다시 시도해주세요");
   };
 
-  const handleGoToRoom = () => {
-    saveMemberId(roomCode, "host_" + roomCode); // TODO: 실제 API 연동 후 hostMemberId로 교체
+  const handleGoToRoom = async () => {
+    try {
+      const status = await fetchRoomStatus(roomCode);
+      const host = status.members.find((m) => m.isHost);
+      if (host) saveMemberId(roomCode, host.id);
+    } catch {
+      // 세션 저장 실패해도 일단 이동 — 도착 후 guest 모드로 폴백
+    }
     router.push(`/rooms/${encodeURIComponent(roomCode)}`);
   };
 

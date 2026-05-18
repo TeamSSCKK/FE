@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
+import { saveMemberId } from "@/shared/lib/room-session";
 import { cn } from "@/shared/lib/utils";
 import {
   fetchRoomStatus,
-  deleteMember,
   type RoomStatus,
   type Member,
 } from "@/entities/room";
@@ -95,8 +95,6 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
   const [roomStatus, setRoomStatus] = useState<RoomStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [localMemberId, setLocalMemberId] = useState(currentMemberId);
-  const [showManage, setShowManage] = useState(false);
-  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   const loadRoomStatus = useCallback(async () => {
     try {
@@ -140,19 +138,8 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
   );
 
   const handleJoinSuccess = (memberId: string) => {
+    saveMemberId(roomCode, memberId);
     setLocalMemberId(memberId);
-  };
-
-  const handleDelete = async (memberId: string) => {
-    try {
-      setIsDeletingId(memberId);
-      await deleteMember({ code: roomCode, memberId });
-      await loadRoomStatus();
-    } catch (error) {
-      console.error("deleteMember error", error);
-    } finally {
-      setIsDeletingId(null);
-    }
   };
 
   const handleShare = async () => {
@@ -189,59 +176,6 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
       <div className="min-h-screen bg-white p-5">
         <div className="animate-fade-up">
           <RoomJoinForm roomCode={roomCode} onSuccess={handleJoinSuccess} />
-        </div>
-      </div>
-    );
-  }
-
-  if (showManage && currentMember?.isHost) {
-    return (
-      <div className="flex min-h-screen flex-col bg-white">
-        {/* 헤더 */}
-        <div className="border-b border-border/40 px-5 py-4">
-          <p className="text-[11px] text-muted-foreground">
-            {formatKoreanDateTime(roomStatus.room.dateTime)}
-          </p>
-          <h1 className="mt-2 text-[24px] font-bold tracking-tight text-gray-900">
-            {roomStatus.room.name}
-          </h1>
-        </div>
-
-        {/* 내용 */}
-        <div className="flex-1 space-y-4 p-5">
-          <h2 className="text-lg font-semibold text-gray-900">참가자 관리</h2>
-          <p className="text-sm text-muted-foreground">
-            참가자 {roomStatus.members.length}명
-          </p>
-
-          <div className="space-y-3 rounded-2xl bg-primary/[0.04] p-4">
-            {roomStatus.members.map((member) => (
-              <MemberRow
-                key={member.id}
-                member={member}
-                showDelete={!member.isHost}
-                isDeleting={isDeletingId === member.id}
-                onDelete={() => handleDelete(member.id)}
-              />
-            ))}
-
-            {Array.from({
-              length: Math.max(0, roomStatus.totalCount - roomStatus.members.length),
-            }).map((_, i) => (
-              <div key={`empty-${i}`} className="h-16 rounded-2xl bg-white" />
-            ))}
-          </div>
-        </div>
-
-        {/* 돌아가기 버튼 */}
-        <div className="sticky bottom-0 border-t border-border/40 bg-white p-5">
-          <Button
-            onClick={() => setShowManage(false)}
-            variant="secondary"
-            className="h-14 w-full rounded-2xl text-base font-semibold"
-          >
-            돌아가기
-          </Button>
         </div>
       </div>
     );
@@ -361,7 +295,7 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
             {mode === "host" && (
               <button
                 type="button"
-                onClick={() => setShowManage(true)}
+                onClick={() => router.push(`/rooms/${roomCode}/manage`)}
                 className="text-sm font-semibold text-primary transition active:scale-95"
               >
                 참가자 관리
