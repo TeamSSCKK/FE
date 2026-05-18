@@ -209,7 +209,7 @@ export function RoomLocationView({ roomCode }: Props) {
       setSubmitError("위치 저장에 실패했어요. 잠시 후 다시 시도해주세요.");
       setIsSubmitting(false);
     }
-  }, [selected, memberId, roomCode, router, setIsSubmitting]);
+  }, [selected, memberId, roomCode, router, setIsSubmitting, setSubmitError]);
 
   if (loadError) {
     return (
@@ -300,7 +300,7 @@ export function RoomLocationView({ roomCode }: Props) {
           </p>
         )}
         {submitError && (
-          <p className="mt-2 text-center text-[12px] text-destructive">
+          <p className="mt-2 text-center text-[11px] text-destructive">
             {submitError}
           </p>
         )}
