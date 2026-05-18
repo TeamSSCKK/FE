@@ -7,13 +7,13 @@ export function SelectedLocationCard() {
 
   // 윗줄(label)과 겹치지 않는 보조 주소를 아랫줄에 표시한다.
   // 검색: label=장소명 → 아랫줄=도로명 주소 / 지도: label=도로명 주소 → 아랫줄=지번 주소
-  const sub = selected
-    ? selected.roadAddress && selected.roadAddress !== selected.label
-      ? selected.roadAddress
-      : selected.jibunAddress && selected.jibunAddress !== selected.label
-        ? selected.jibunAddress
-        : ""
-    : "";
+  const sub = (() => {
+    if (!selected) return "";
+    const { label, roadAddress, jibunAddress } = selected;
+    if (roadAddress && roadAddress !== label) return roadAddress;
+    if (jibunAddress && jibunAddress !== label) return jibunAddress;
+    return "";
+  })();
 
   return (
     <div className="rounded-2xl bg-neutral-100 px-5 py-4">

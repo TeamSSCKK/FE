@@ -125,7 +125,11 @@ export function NaverMap({
 
         // 줌 변화 없이 중심만 이동 = 사용자 드래그 → 위치 갱신
         if (!centerMoved) return;
-        onMapIdleRef.current?.({ lat: c.y, lng: c.x });
+        // reverseGeocode가 진행되는 동안 줌 보정이 낡은 좌표를 쓰지 않도록
+        // centerRef를 즉시 갱신한다(center prop 반영은 setSelected 이후라 늦다).
+        const next = { lat: c.y, lng: c.x };
+        centerRef.current = next;
+        onMapIdleRef.current?.(next);
       },
     );
     return () => {
@@ -143,7 +147,10 @@ export function NaverMap({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      map.setZoom(map.getZoom() + (e.deltaY < 0 ? 1 : -1), true);
+      if (e.deltaY === 0) return;
+      // getZoom()이 애니메이션 중 소수 중간값을 반환해 누적이 새는 것을 Math.round로 방지
+      const delta = e.deltaY < 0 ? 1 : -1;
+      map.setZoom(Math.round(map.getZoom()) + delta, true);
     };
     container?.addEventListener("wheel", handleWheel, { passive: false });
 
