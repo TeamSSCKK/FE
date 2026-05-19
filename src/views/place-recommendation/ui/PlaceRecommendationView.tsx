@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, MapPin, AlertTriangle } from "lucide-react";
 import { fetchRoomStatus, type Room } from "@/entities/room";
@@ -36,6 +36,16 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // 언마운트 이후 비동기 응답이 setState를 건드리지 않도록 막는다.
+  // strict mode 재마운트 대비로 setup에서 true를 다시 세팅한다.
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   // 헤더용 모임 정보 — 실패해도 화면 흐름은 막지 않는다.
   useEffect(() => {
     let canceled = false;
@@ -55,10 +65,12 @@ export function PlaceRecommendationView({ roomCode }: Props) {
     setErrorMessage(null);
     try {
       await fetchPlaceRecommendation(roomCode);
+      if (!isMounted.current) return;
       setPhase("success");
     } catch (e) {
       // 백엔드 raw 메시지 대신 사용자용 한국어 메시지로 통일
       console.error("fetchPlaceRecommendation error", e);
+      if (!isMounted.current) return;
       setErrorMessage("추천 장소를 찾지 못했어요. 잠시 후 다시 시도해주세요.");
       setPhase("error");
     }
