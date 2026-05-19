@@ -96,20 +96,44 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [localMemberId, setLocalMemberId] = useState(currentMemberId);
 
-  const loadRoomStatus = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const status = await fetchRoomStatus(roomCode);
-      setRoomStatus(status);
-    } catch (error) {
-      console.error("fetchRoomStatus error", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [roomCode]);
+  // silent: 폴링용 백그라운드 재조회 — 로딩 스피너를 띄우지 않는다.
+  const loadRoomStatus = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setIsLoading(true);
+        const status = await fetchRoomStatus(roomCode);
+        setRoomStatus(status);
+      } catch (error) {
+        console.error("fetchRoomStatus error", error);
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [roomCode],
+  );
 
+  // 최초 1회 로드 + 폴링으로 다른 참가자의 입장/입력을 반영한다.
+  // 재귀 setTimeout — 한 번의 재조회가 끝난 뒤 다음 호출을 예약해
+  // 응답이 느려도 요청이 중첩되지 않는다.
   useEffect(() => {
-    void loadRoomStatus();
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      timer = setTimeout(async () => {
+        await loadRoomStatus(true);
+        if (!canceled) scheduleNext();
+      }, 3000);
+    };
+
+    void loadRoomStatus().then(() => {
+      if (!canceled) scheduleNext();
+    });
+
+    return () => {
+      canceled = true;
+      clearTimeout(timer);
+    };
   }, [loadRoomStatus]);
 
   const currentMember = useMemo(
@@ -132,8 +156,11 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
     );
   }, [roomStatus]);
 
-  const hasIncompleteLocation = useMemo(
-    () => !!roomStatus && roomStatus.locationInputCount < roomStatus.totalCount,
+  const hasIncompleteInput = useMemo(
+    () =>
+      !!roomStatus &&
+      (roomStatus.locationInputCount < roomStatus.totalCount ||
+        roomStatus.preferenceInputCount < roomStatus.totalCount),
     [roomStatus],
   );
 
@@ -209,8 +236,13 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
         </div>
       </div>
 
-      {/* 콘텐츠 */}
-      <div className="flex-1 space-y-4 p-5">
+      {/* 콘텐츠 — host 모드는 하단 고정 버튼에 가리지 않도록 여유 패딩 */}
+      <div
+        className={cn(
+          "flex-1 space-y-4 p-5",
+          mode === "host" && "pb-28",
+        )}
+      >
         {/* 인사말 및 버튼 */}
         <div className="animate-fade-up rounded-2xl bg-primary/[0.06] p-5">
           <p className="text-base font-semibold text-gray-900">
@@ -325,20 +357,46 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
         </div>
 
         {/* 경고 배너 */}
-        {hasIncompleteLocation && (
+        {hasIncompleteInput && (
           <div className="animate-fade-up flex gap-3 rounded-2xl bg-primary/[0.04] p-4">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-yellow-500" />
             <div>
-              <p className="text-sm font-semibold text-gray-900">
-                아직 위치를 입력하지 않은 참가자가 있습니다.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                모든 참가자가 위치와 취향을 입력해야 추천이 시작됩니다.
-              </p>
+              {mode === "host" ? (
+                <>
+                  <p className="text-sm font-semibold text-gray-900">
+                    지금 추천을 시작하면 결과가 공정하지 않을 수 있어요.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    모든 참가자가 위치와 취향을 입력한 뒤 시작하는 것을
+                    권장해요.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-gray-900">
+                    아직 위치를 입력하지 않은 참가자가 있습니다.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    모든 참가자가 위치와 취향을 입력해야 추천이 시작됩니다.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* 호스트 전용 — 큐레이션 시작 (하단 고정) */}
+      {mode === "host" && (
+        <div className="sticky bottom-0 z-10 border-t border-border/40 bg-white px-5 pb-6 pt-3">
+          <Button
+            onClick={() => router.push(`/rooms/${roomCode}/curation`)}
+            className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+          >
+            큐레이션 시작하기
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
