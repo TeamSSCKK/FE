@@ -1,34 +1,45 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MapPin } from "lucide-react";
 import { env } from "@/shared/config/env";
 import { cn } from "@/shared/lib/utils";
 import { loadNaverMapScript } from "../lib/load-script";
-import type { LatLng, NaverMapProps } from "../model/types";
+import type { NaverMapProps } from "../model/types";
+
+// 사용자 조작과 프로그래매틱 이동을 가르는 좌표 노이즈 임계값 (약 0.1m)
+const EPS = 1e-6;
 
 export function NaverMap({
   center,
-  marker,
-  markerLabel,
-  onMapClick,
-  onMarkerDragEnd,
+  onMapIdle,
   onReady,
   className,
 }: NaverMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-  const infoRef = useRef<any>(null);
-  const clickListenerRef = useRef<any>(null);
-  const dragListenerRef = useRef<any>(null);
   const onReadyRef = useRef(onReady);
+  const centerRef = useRef(center);
+  const onMapIdleRef = useRef(onMapIdle);
+  const programmaticMoveRef = useRef(false);
+  const lastZoomRef = useRef(16);
   const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // ref 동기화 — 선언 순서 유지: centerRef가 아래 setCenter effect보다 먼저 갱신돼야 한다.
   useEffect(() => {
     onReadyRef.current = onReady;
   }, [onReady]);
 
+  useEffect(() => {
+    centerRef.current = { lat: center.lat, lng: center.lng };
+  }, [center.lat, center.lng]);
+
+  useEffect(() => {
+    onMapIdleRef.current = onMapIdle;
+  }, [onMapIdle]);
+
+  // 지도 생성
   useEffect(() => {
     let canceled = false;
     let resizeObserver: ResizeObserver | null = null;
@@ -44,6 +55,9 @@ export function NaverMap({
           zoomControl: false,
           mapDataControl: false,
           scaleControl: false,
+          // 기본 줌은 포인터 기준이라 끈다 — 아래 커스텀 줌이 중심(핀) 기준으로 처리
+          scrollWheel: false,
+          disableDoubleClickZoom: true,
           // 네이버 로고는 약관상 제거 불가 — 위치만 좌측 하단으로 이동
           logoControl: true,
           logoControlOptions: {
@@ -72,111 +86,100 @@ export function NaverMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // idle 리스너 — isReady 후 1회 등록. 줌이 완전히 끝난 시점이라 보정이 확실히 반영된다.
+  // - 프로그래매틱 이동(setCenter)이 유발한 idle: 가드 플래그로 무시
+  // - 줌으로 중심이 밀린 경우: 핀 위치로 복원하되 위치는 갱신하지 않음
+  // - 순수 드래그: onMapIdle 호출
   useEffect(() => {
     if (!isReady || !mapRef.current) return;
     const { naver } = window;
-    clickListenerRef.current = naver.maps.Event.addListener(
+    const listener = naver.maps.Event.addListener(
       mapRef.current,
-      "click",
-      (e: any) => {
-        const latlng: LatLng = { lat: e.coord.y, lng: e.coord.x };
-        onMapClick?.(latlng);
+      "idle",
+      () => {
+        const map = mapRef.current;
+        const currentZoom = map.getZoom();
+        const zoomChanged = currentZoom !== lastZoomRef.current;
+        lastZoomRef.current = currentZoom;
+
+        // setCenter()가 유발한 idle → 1회 소비하고 무시
+        if (programmaticMoveRef.current) {
+          programmaticMoveRef.current = false;
+          return;
+        }
+
+        const c = map.getCenter();
+        const cur = centerRef.current;
+        const centerMoved =
+          Math.abs(c.y - cur.lat) >= EPS || Math.abs(c.x - cur.lng) >= EPS;
+
+        // 줌으로 중심이 밀렸으면 핀 위치로 복원 — "핀(화면 중앙) 기준 줌".
+        // 위치 자체는 바꾸지 않으므로 onMapIdle은 호출하지 않는다.
+        if (zoomChanged) {
+          if (centerMoved) {
+            programmaticMoveRef.current = true;
+            map.setCenter(new naver.maps.LatLng(cur.lat, cur.lng));
+          }
+          return;
+        }
+
+        // 줌 변화 없이 중심만 이동 = 사용자 드래그 → 위치 갱신
+        if (!centerMoved) return;
+        // reverseGeocode가 진행되는 동안 줌 보정이 낡은 좌표를 쓰지 않도록
+        // centerRef를 즉시 갱신한다(center prop 반영은 setSelected 이후라 늦다).
+        const next = { lat: c.y, lng: c.x };
+        centerRef.current = next;
+        onMapIdleRef.current?.(next);
       },
     );
     return () => {
-      if (clickListenerRef.current) {
-        naver.maps.Event.removeListener(clickListenerRef.current);
-        clickListenerRef.current = null;
-      }
+      naver.maps.Event.removeListener(listener);
     };
-  }, [isReady, onMapClick]);
+  }, [isReady]);
 
+  // 커스텀 줌 — 휠/더블클릭을 map.setZoom으로 처리한다.
+  // setZoom은 항상 지도 중심 기준이라 줌 애니메이션 자체가 핀(화면 중앙) 기준이 된다.
   useEffect(() => {
     if (!isReady || !mapRef.current) return;
     const { naver } = window;
-    const newCenter = new naver.maps.LatLng(center.lat, center.lng);
-    mapRef.current.setCenter(newCenter);
-  }, [isReady, center.lat, center.lng]);
+    const map = mapRef.current;
+    const container = containerRef.current;
 
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.deltaY === 0) return;
+      // getZoom()이 애니메이션 중 소수 중간값을 반환해 누적이 새는 것을 Math.round로 방지
+      const delta = e.deltaY < 0 ? 1 : -1;
+      map.setZoom(Math.round(map.getZoom()) + delta, true);
+    };
+    container?.addEventListener("wheel", handleWheel, { passive: false });
+
+    const dblListener = naver.maps.Event.addListener(map, "dblclick", () => {
+      map.setZoom(map.getZoom() + 1, true);
+    });
+
+    return () => {
+      container?.removeEventListener("wheel", handleWheel);
+      naver.maps.Event.removeListener(dblListener);
+    };
+  }, [isReady]);
+
+  // center prop 변경 → 지도 이동(프로그래매틱). panTo로 부드럽게 미끄러지며,
+  // 애니메이션 끝에 발생하는 idle 1회를 가드 플래그로 무시시킨다.
   useEffect(() => {
     if (!isReady || !mapRef.current) return;
     const { naver } = window;
-
-    if (!marker) {
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-        markerRef.current = null;
-      }
-      if (infoRef.current) {
-        infoRef.current.close();
-        infoRef.current = null;
-      }
+    const c = mapRef.current.getCenter();
+    // 이미 그 위치면 이동 스킵 — 효과 없는 호출 + 가드 플래그 오염 방지
+    if (Math.abs(c.y - center.lat) < EPS && Math.abs(c.x - center.lng) < EPS) {
       return;
     }
-
-    const position = new naver.maps.LatLng(marker.lat, marker.lng);
-
-    if (!markerRef.current) {
-      markerRef.current = new naver.maps.Marker({
-        position,
-        map: mapRef.current,
-        draggable: true,
-      });
-      dragListenerRef.current = naver.maps.Event.addListener(
-        markerRef.current,
-        "dragend",
-        (e: any) => {
-          const coord = e.coord;
-          onMarkerDragEnd?.({ lat: coord.y, lng: coord.x });
-        },
-      );
-    } else {
-      markerRef.current.setPosition(position);
-    }
-
-    if (markerLabel) {
-      if (!infoRef.current) {
-        infoRef.current = new naver.maps.InfoWindow({
-          content: `<div style="padding:6px 10px;font-size:12px;font-weight:600;color:#111;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;">${escapeHtml(markerLabel)}</div>`,
-          borderWidth: 0,
-          backgroundColor: "transparent",
-          disableAnchor: true,
-          pixelOffset: new naver.maps.Point(0, -8),
-        });
-      } else {
-        infoRef.current.setContent(
-          `<div style="padding:6px 10px;font-size:12px;font-weight:600;color:#111;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;">${escapeHtml(markerLabel)}</div>`,
-        );
-      }
-      infoRef.current.open(mapRef.current, markerRef.current);
-    } else if (infoRef.current) {
-      infoRef.current.close();
-    }
-
-    return () => {
-      // marker/info는 다음 effect 또는 unmount에서 정리
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, marker?.lat, marker?.lng, markerLabel, onMarkerDragEnd]);
-
-  useEffect(() => {
-    return () => {
-      const naver = window.naver;
-      if (!naver) return;
-      if (dragListenerRef.current) {
-        naver.maps.Event.removeListener(dragListenerRef.current);
-      }
-      if (clickListenerRef.current) {
-        naver.maps.Event.removeListener(clickListenerRef.current);
-      }
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-      }
-      if (infoRef.current) {
-        infoRef.current.close();
-      }
-    };
-  }, []);
+    programmaticMoveRef.current = true;
+    mapRef.current.panTo(new naver.maps.LatLng(center.lat, center.lng), {
+      duration: 500,
+      easing: "easeOutCubic",
+    });
+  }, [isReady, center.lat, center.lng]);
 
   if (loadError) {
     return (
@@ -192,18 +195,19 @@ export function NaverMap({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("naver-map h-full w-full", className)}
-    />
+    <div className={cn("relative h-full w-full", className)}>
+      <div ref={containerRef} className="naver-map h-full w-full" />
+      {/* 센터 핀 — 화면 정중앙 고정. pointer-events-none으로 지도 드래그를 막지 않는다.
+          -translate-y-full로 핀 하단 꼭지점이 지도 중심을 가리키게 한다. */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-full">
+        <MapPin
+          className="h-9 w-9 fill-primary text-primary drop-shadow-md"
+          strokeWidth={1.5}
+          aria-hidden
+        />
+      </div>
+      {/* 핀이 정확히 가리키는 좌표를 표시하는 정밀 앵커 — 검은 점 + 흰 링 */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white" />
+    </div>
   );
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

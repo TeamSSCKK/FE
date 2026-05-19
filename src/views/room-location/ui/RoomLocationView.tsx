@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import {
@@ -37,6 +37,8 @@ export function RoomLocationView({ roomCode }: Props) {
   const [mapReady, setMapReady] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // 연속 idle 시 느린 reverseGeocode 응답이 최신을 덮어쓰지 않도록 하는 시퀀스 카운터
+  const idleSeqRef = useRef(0);
 
   const mode = useLocationInputStore((s) => s.mode);
   const selected = useLocationInputStore((s) => s.selected);
@@ -132,8 +134,10 @@ export function RoomLocationView({ roomCode }: Props) {
     };
   }, [mode, mapReady, selected, setSelected]);
 
-  const handleMapInteraction = useCallback(
+  // 센터 핀: 지도를 움직여 멈춘 순간의 중심 좌표를 출발지로 잡는다.
+  const handleMapIdle = useCallback(
     async (coords: { lat: number; lng: number }) => {
+      const seq = ++idleSeqRef.current;
       let roadAddress = "";
       let jibunAddress = "";
       try {
@@ -141,10 +145,13 @@ export function RoomLocationView({ roomCode }: Props) {
         roadAddress = r.roadAddress;
         jibunAddress = r.jibunAddress;
       } catch {
-        // ignore
+        // 주소를 못 얻어도 좌표는 유효 — 핀 위치는 살아있다
       }
+      // 그 사이 새 idle이 발생했으면 stale 응답이므로 폐기
+      if (seq !== idleSeqRef.current) return;
+      // 지도 임의 지점엔 장소명이 없으므로 도로명 주소를 대표 이름으로 쓴다.
       setSelected({
-        label: "선택한 위치",
+        label: roadAddress || jibunAddress || "지도에서 선택한 위치",
         coords,
         roadAddress,
         jibunAddress,
@@ -228,8 +235,6 @@ export function RoomLocationView({ roomCode }: Props) {
   }
 
   const center = selected?.coords ?? SEOUL_CITY_HALL;
-  const marker = selected?.coords;
-  const markerLabel = selected?.label;
 
   return (
     <div className="flex h-dvh flex-col bg-background">
@@ -270,15 +275,13 @@ export function RoomLocationView({ roomCode }: Props) {
       <div className="relative mx-5 mt-3 min-h-[200px] flex-1 overflow-hidden rounded-2xl bg-neutral-100">
         <NaverMap
           center={center}
-          marker={marker}
-          markerLabel={markerLabel}
-          onMapClick={handleMapInteraction}
-          onMarkerDragEnd={handleMapInteraction}
+          onMapIdle={handleMapIdle}
           onReady={() => setMapReady(true)}
         />
-        {mode === "search" && (
-          <AddressSearchOverlay onPick={handlePickFromSearch} />
-        )}
+        <AddressSearchOverlay
+          visible={mode === "search"}
+          onPick={handlePickFromSearch}
+        />
         <CurrentLocationButton
           onClick={handleLocateCurrentPosition}
           isLocating={isLocating}
