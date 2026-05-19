@@ -142,6 +142,9 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
     setLocalMemberId(memberId);
   };
 
+  // 취향 입력·내 정보 수정 화면이 아직 준비 중 — 안내만 공통으로 처리
+  const handleNotReady = () => alert("해당 기능은 준비 중입니다!");
+
   const handleShare = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -223,16 +226,16 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
                 위치 입력하기
               </Button>
               <Button
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+                onClick={handleNotReady}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold"
+                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 취향 입력하기
               </Button>
               <Button
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+                onClick={handleNotReady}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold"
+                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 내 정보 수정하기
               </Button>
@@ -246,16 +249,16 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
                 위치 수정하기
               </Button>
               <Button
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+                onClick={handleNotReady}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold"
+                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 취향 수정하기
               </Button>
               <Button
-                onClick={() => alert('해당 기능은 준비 중입니다!')}
+                onClick={handleNotReady}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold"
+                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
                 내 정보 수정하기
               </Button>
