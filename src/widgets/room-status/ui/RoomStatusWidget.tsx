@@ -112,11 +112,28 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
     [roomCode],
   );
 
-  // 최초 1회 로드 + 3초 폴링으로 다른 참가자의 입장/입력을 반영한다.
+  // 최초 1회 로드 + 폴링으로 다른 참가자의 입장/입력을 반영한다.
+  // 재귀 setTimeout — 한 번의 재조회가 끝난 뒤 다음 호출을 예약해
+  // 응답이 느려도 요청이 중첩되지 않는다.
   useEffect(() => {
-    void loadRoomStatus();
-    const timer = setInterval(() => void loadRoomStatus(true), 3000);
-    return () => clearInterval(timer);
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const scheduleNext = () => {
+      timer = setTimeout(async () => {
+        await loadRoomStatus(true);
+        if (!canceled) scheduleNext();
+      }, 3000);
+    };
+
+    void loadRoomStatus().then(() => {
+      if (!canceled) scheduleNext();
+    });
+
+    return () => {
+      canceled = true;
+      clearTimeout(timer);
+    };
   }, [loadRoomStatus]);
 
   const currentMember = useMemo(
@@ -219,8 +236,13 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
         </div>
       </div>
 
-      {/* 콘텐츠 */}
-      <div className="flex-1 space-y-4 p-5">
+      {/* 콘텐츠 — host 모드는 하단 고정 버튼에 가리지 않도록 여유 패딩 */}
+      <div
+        className={cn(
+          "flex-1 space-y-4 p-5",
+          mode === "host" && "pb-28",
+        )}
+      >
         {/* 인사말 및 버튼 */}
         <div className="animate-fade-up rounded-2xl bg-primary/[0.06] p-5">
           <p className="text-base font-semibold text-gray-900">
