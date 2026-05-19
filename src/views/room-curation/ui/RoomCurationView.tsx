@@ -79,7 +79,7 @@ export function RoomCurationView({ roomCode }: Props) {
           type="button"
           onClick={() => router.back()}
           aria-label="뒤로 가기"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition active:scale-90"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition-all duration-150 hover:bg-primary/5 active:scale-95 active:bg-primary/10"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -112,7 +112,7 @@ export function RoomCurationView({ roomCode }: Props) {
             caption="아직 모임 위치가 안 정해졌다면?"
             title="모임 위치 추천"
             delay={160}
-            onClick={handleNotReady}
+            onClick={() => router.push(`/rooms/${roomCode}/curation/location`)}
           />
           <CurationCard
             caption="저희는 이미 장소를 정했어요."
