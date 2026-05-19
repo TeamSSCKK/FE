@@ -103,23 +103,35 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   // 캐러셀 — 가로 스크롤 위치로 중앙 카드를 판별한다.
   const carouselRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const scrollRaf = useRef<number | null>(null);
 
+  // 스크롤 이벤트는 매우 잦으므로 rAF로 프레임당 1회만 측정 — 리플로우 batch
   const handleCarouselScroll = useCallback(() => {
-    const container = carouselRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const containerCenter = rect.left + rect.width / 2;
-    let nearestId: string | null = null;
-    let nearestDist = Infinity;
-    cardRefs.current.forEach((el, id) => {
-      const r = el.getBoundingClientRect();
-      const dist = Math.abs(r.left + r.width / 2 - containerCenter);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearestId = id;
-      }
+    if (scrollRaf.current != null) return;
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = null;
+      const container = carouselRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const containerCenter = rect.left + rect.width / 2;
+      let nearestId: string | null = null;
+      let nearestDist = Infinity;
+      cardRefs.current.forEach((el, id) => {
+        const r = el.getBoundingClientRect();
+        const dist = Math.abs(r.left + r.width / 2 - containerCenter);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestId = id;
+        }
+      });
+      if (nearestId) setFocusedPlaceId(nearestId);
     });
-    if (nearestId) setFocusedPlaceId(nearestId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRaf.current != null) cancelAnimationFrame(scrollRaf.current);
+    };
   }, []);
 
   // 지도 마커 클릭 → 해당 카드를 캐러셀 중앙으로 스크롤

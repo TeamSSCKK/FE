@@ -34,6 +34,15 @@ function buildMarkerContent(mk: MapMarker): string {
   return `<div style="position:relative;"><div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);cursor:${cursor};">${inner}</div></div>`;
 }
 
+function markerZIndex(variant: MapMarker["variant"]): number {
+  return variant === "place-focused" ? 200 : variant === "place" ? 100 : 50;
+}
+
+/** 마커의 시각 속성 시그니처 — 변경 여부 판별용 */
+function markerSig(mk: MapMarker): string {
+  return `${mk.variant}|${mk.label}|${mk.lat}|${mk.lng}`;
+}
+
 export function NaverMap({
   center,
   onMapIdle,
@@ -44,7 +53,9 @@ export function NaverMap({
 }: NaverMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const markersRef = useRef<
+    Map<string, { marker: any; listener: any; sig: string }>
+  >(new Map());
   const onReadyRef = useRef(onReady);
   const centerRef = useRef(center);
   const onMapIdleRef = useRef(onMapIdle);
@@ -208,42 +219,76 @@ export function NaverMap({
     });
   }, [isReady, center.lat, center.lng]);
 
-  // 마커 렌더링 — markers 변경 시 기존 마커를 모두 제거하고 재생성한다.
+  // 마커 렌더링 — id 기준 diffing.
+  // 전체 재생성을 피해, 사라진 마커만 제거 / 새것만 생성 / 변경된 것만 갱신한다.
+  // (스크롤 중 멤버 마커가 깜빡이거나 불필요하게 재생성되는 것을 방지)
   useEffect(() => {
     if (!isReady || !mapRef.current) return;
     const { naver } = window;
     const map = mapRef.current;
-    const listeners: any[] = [];
+    const store = markersRef.current;
+    const nextIds = new Set(markers.map((m) => m.id));
 
-    markers.forEach((mk) => {
-      const marker = new naver.maps.Marker({
-        position: new naver.maps.LatLng(mk.lat, mk.lng),
-        map,
-        icon: {
-          content: buildMarkerContent(mk),
-          anchor: new naver.maps.Point(0, 0),
-        },
-        zIndex:
-          mk.variant === "place-focused"
-            ? 200
-            : mk.variant === "place"
-              ? 100
-              : 50,
-      });
-      if (mk.onClick) {
-        listeners.push(
-          naver.maps.Event.addListener(marker, "click", mk.onClick),
-        );
+    // 사라진 마커 제거
+    store.forEach((entry, id) => {
+      if (!nextIds.has(id)) {
+        if (entry.listener) naver.maps.Event.removeListener(entry.listener);
+        entry.marker.setMap(null);
+        store.delete(id);
       }
-      markersRef.current.push(marker);
     });
 
-    return () => {
-      listeners.forEach((l) => naver.maps.Event.removeListener(l));
-      markersRef.current.forEach((m) => m.setMap(null));
-      markersRef.current = [];
-    };
+    markers.forEach((mk) => {
+      const sig = markerSig(mk);
+      const existing = store.get(mk.id);
+      if (existing) {
+        // 시각 속성은 시그니처가 바뀐 경우에만 갱신 → 멤버 마커는 깜빡임 없음
+        if (existing.sig !== sig) {
+          existing.marker.setPosition(new naver.maps.LatLng(mk.lat, mk.lng));
+          existing.marker.setIcon({
+            content: buildMarkerContent(mk),
+            anchor: new naver.maps.Point(0, 0),
+          });
+          existing.marker.setZIndex(markerZIndex(mk.variant));
+          existing.sig = sig;
+        }
+        // onClick은 매 렌더 새 클로저 — 리스너만 가볍게 교체 (DOM 변화 없음)
+        if (existing.listener) naver.maps.Event.removeListener(existing.listener);
+        existing.listener = mk.onClick
+          ? naver.maps.Event.addListener(existing.marker, "click", mk.onClick)
+          : null;
+      } else {
+        const marker = new naver.maps.Marker({
+          position: new naver.maps.LatLng(mk.lat, mk.lng),
+          map,
+          icon: {
+            content: buildMarkerContent(mk),
+            anchor: new naver.maps.Point(0, 0),
+          },
+          zIndex: markerZIndex(mk.variant),
+        });
+        const listener = mk.onClick
+          ? naver.maps.Event.addListener(marker, "click", mk.onClick)
+          : null;
+        store.set(mk.id, { marker, listener, sig });
+      }
+    });
   }, [isReady, markers]);
+
+  // 언마운트 시 전체 마커·리스너 정리
+  useEffect(() => {
+    const store = markersRef.current;
+    return () => {
+      const naver = window.naver;
+      store.forEach((entry) => {
+        if (entry.listener && naver) {
+          naver.maps.Event.removeListener(entry.listener);
+        }
+        entry.marker.setMap(null);
+      });
+      store.clear();
+    };
+  }, []);
 
   if (loadError) {
     return (
