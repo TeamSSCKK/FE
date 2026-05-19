@@ -5,19 +5,46 @@ import { MapPin } from "lucide-react";
 import { env } from "@/shared/config/env";
 import { cn } from "@/shared/lib/utils";
 import { loadNaverMapScript } from "../lib/load-script";
-import type { NaverMapProps } from "../model/types";
+import type { MapMarker, NaverMapProps } from "../model/types";
 
 // 사용자 조작과 프로그래매틱 이동을 가르는 좌표 노이즈 임계값 (약 0.1m)
 const EPS = 1e-6;
+
+function escapeHtml(s: string): string {
+  const map: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return s.replace(/[&<>"']/g, (c) => map[c]);
+}
+
+/** 마커 variant별 HTML 콘텐츠 — 가변 폭에도 좌표 점 중심에 오도록 감싼다. */
+function buildMarkerContent(mk: MapMarker): string {
+  const label = escapeHtml(mk.label);
+  const inner =
+    mk.variant === "member"
+      ? `<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 text-[10px] font-bold text-white ring-2 ring-white shadow">${label}</div>`
+      : mk.variant === "place-focused"
+        ? `<div class="whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-[12px] font-bold text-white shadow-lg">${label}</div>`
+        : `<div class="whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-primary ring-1 ring-primary/40 shadow-md">${label}</div>`;
+  const cursor = mk.onClick ? "pointer" : "default";
+  return `<div style="position:relative;"><div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);cursor:${cursor};">${inner}</div></div>`;
+}
 
 export function NaverMap({
   center,
   onMapIdle,
   onReady,
   className,
+  markers = [],
+  showCenterPin = true,
 }: NaverMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
   const onReadyRef = useRef(onReady);
   const centerRef = useRef(center);
   const onMapIdleRef = useRef(onMapIdle);
@@ -181,6 +208,43 @@ export function NaverMap({
     });
   }, [isReady, center.lat, center.lng]);
 
+  // 마커 렌더링 — markers 변경 시 기존 마커를 모두 제거하고 재생성한다.
+  useEffect(() => {
+    if (!isReady || !mapRef.current) return;
+    const { naver } = window;
+    const map = mapRef.current;
+    const listeners: any[] = [];
+
+    markers.forEach((mk) => {
+      const marker = new naver.maps.Marker({
+        position: new naver.maps.LatLng(mk.lat, mk.lng),
+        map,
+        icon: {
+          content: buildMarkerContent(mk),
+          anchor: new naver.maps.Point(0, 0),
+        },
+        zIndex:
+          mk.variant === "place-focused"
+            ? 200
+            : mk.variant === "place"
+              ? 100
+              : 50,
+      });
+      if (mk.onClick) {
+        listeners.push(
+          naver.maps.Event.addListener(marker, "click", mk.onClick),
+        );
+      }
+      markersRef.current.push(marker);
+    });
+
+    return () => {
+      listeners.forEach((l) => naver.maps.Event.removeListener(l));
+      markersRef.current.forEach((m) => m.setMap(null));
+      markersRef.current = [];
+    };
+  }, [isReady, markers]);
+
   if (loadError) {
     return (
       <div
@@ -199,15 +263,19 @@ export function NaverMap({
       <div ref={containerRef} className="naver-map h-full w-full" />
       {/* 센터 핀 — 화면 정중앙 고정. pointer-events-none으로 지도 드래그를 막지 않는다.
           -translate-y-full로 핀 하단 꼭지점이 지도 중심을 가리키게 한다. */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-full">
-        <MapPin
-          className="h-9 w-9 fill-primary text-primary drop-shadow-md"
-          strokeWidth={1.5}
-          aria-hidden
-        />
-      </div>
-      {/* 핀이 정확히 가리키는 좌표를 표시하는 정밀 앵커 — 검은 점 + 흰 링 */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white" />
+      {showCenterPin && (
+        <>
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-full">
+            <MapPin
+              className="h-9 w-9 fill-primary text-primary drop-shadow-md"
+              strokeWidth={1.5}
+              aria-hidden
+            />
+          </div>
+          {/* 핀이 정확히 가리키는 좌표를 표시하는 정밀 앵커 — 검은 점 + 흰 링 */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white" />
+        </>
+      )}
     </div>
   );
 }
