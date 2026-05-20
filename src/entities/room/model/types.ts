@@ -36,6 +36,24 @@ export interface Location {
   lng: number;
 }
 
+export type PreferenceTone = "like" | "dislike";
+
+export interface PreferenceTagInput {
+  id: string;
+  label: string;
+  tone: PreferenceTone;
+}
+
+export interface RestrictionTagInput {
+  id: string;
+  label: string;
+}
+
+export interface MemberPreference {
+  tags: PreferenceTagInput[];
+  restrictions: RestrictionTagInput[];
+}
+
 /**
  * 방 멤버 정보
  */
@@ -56,6 +74,8 @@ export interface Member {
   locationLabel?: string;
   /** 본인이 입력한 출발지 (좌표 + 주소) */
   location?: Location;
+  /** 본인이 입력한 음식 취향/제약 */
+  preference?: MemberPreference;
 }
 
 /**
