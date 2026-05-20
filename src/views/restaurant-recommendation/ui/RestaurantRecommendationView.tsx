@@ -53,6 +53,11 @@ export function RestaurantRecommendationView({ code }: Props) {
         if (!isMounted.current || canceled) return;
         const result = await fetchRestaurantRecommendation(code);
         if (canceled) return;
+        if (result.restaurants.length === 0) {
+          setErrorMessage("추천할 수 있는 식당이 없어요.");
+          setPhase("error");
+          return;
+        }
         setRestaurants(result.restaurants);
         setPhase("success");
       } catch (e) {
