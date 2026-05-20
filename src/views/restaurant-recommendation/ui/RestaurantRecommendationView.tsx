@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { fetchRoomStatus } from "@/entities/room";
+import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
+import type { RecommendedRestaurant } from "@/entities/restaurant-recommendation/model/types";
 import { loadMemberId } from "@/shared/lib/room-session";
 import { cn } from "@/shared/lib/utils";
 
@@ -13,47 +15,12 @@ interface Props {
 
 type Phase = "loading" | "success" | "error";
 
-interface MockRestaurant {
-  id: string;
-  name: string;
-  category: string;
-  address: string;
-  rating: number;
-  reviewCount: number;
-}
-
-const MOCK_RESTAURANTS: MockRestaurant[] = [
-  {
-    id: "r1",
-    name: "스시 오마카세 강남",
-    category: "일식 · 스시",
-    address: "서울 강남구 강남대로 396",
-    rating: 4.7,
-    reviewCount: 312,
-  },
-  {
-    id: "r2",
-    name: "한우다이닝 모란각",
-    category: "한식 · 한우",
-    address: "서울 강남구 테헤란로 152",
-    rating: 4.6,
-    reviewCount: 278,
-  },
-  {
-    id: "r3",
-    name: "트라토리아 베네",
-    category: "양식 · 이탈리안",
-    address: "서울 강남구 봉은사로 213",
-    rating: 4.5,
-    reviewCount: 196,
-  },
-];
-
 export function RestaurantRecommendationView({ code }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [restaurants, setRestaurants] = useState<RecommendedRestaurant[]>([]);
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -84,6 +51,9 @@ export function RestaurantRecommendationView({ code }: Props) {
         // 추천 시뮬레이션 — 실제 API 연동 전 mock 지연
         await new Promise((r) => setTimeout(r, 1200));
         if (!isMounted.current || canceled) return;
+        const result = await fetchRestaurantRecommendation(code);
+        if (canceled) return;
+        setRestaurants(result.restaurants);
         setPhase("success");
       } catch (e) {
         console.error("restaurant recommendation guard error", e);
@@ -98,10 +68,10 @@ export function RestaurantRecommendationView({ code }: Props) {
     };
   }, [code, router]);
 
-  const totalCount = MOCK_RESTAURANTS.length;
+  const totalCount = restaurants.length;
   const current = useMemo(
-    () => MOCK_RESTAURANTS[activeIndex],
-    [activeIndex],
+    () => restaurants[activeIndex],
+    [restaurants, activeIndex],
   );
 
   const handlePrev = () => {
@@ -193,12 +163,12 @@ export function RestaurantRecommendationView({ code }: Props) {
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
           <MapPin className="h-8 w-8" />
           <p className="text-xs">지도 영역</p>
-          <p className="text-[11px]">{current.address}</p>
+          <p className="text-[11px]">도보 {current.travelTimeMinutes}분</p>
         </div>
       </div>
 
       <div className="mt-3 flex justify-center gap-1.5">
-        {MOCK_RESTAURANTS.map((r, i) => (
+        {restaurants.map((r, i) => (
           <span
             key={r.id}
             className={cn(
@@ -220,17 +190,19 @@ export function RestaurantRecommendationView({ code }: Props) {
         </button>
 
         <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-[11px] text-purple-600">{current.category}</p>
+          <p className="text-[11px] text-purple-600">
+            {current.tags?.join(" · ") || "추천"}
+          </p>
           <p className="mt-1 text-base font-bold text-gray-900">
             {current.name}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {current.address}
+            대표 메뉴 · {current.representativeMenu?.join(", ") || "-"}
           </p>
           <p className="mt-2 text-[12px] text-gray-700">
-            ★ {current.rating.toFixed(1)}{" "}
+            ★ 적합도 {current.fitScore}%{" "}
             <span className="text-muted-foreground">
-              ({current.reviewCount})
+              (도보 {current.travelTimeMinutes}분)
             </span>
           </p>
         </div>
