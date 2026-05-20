@@ -7,7 +7,9 @@ import { fetchRoomStatus, type Room } from "@/entities/room";
 import {
   fetchPlaceRecommendation,
   type PlaceRecommendationResult,
+  type RecommendedPlace,
 } from "@/entities/place-recommendation";
+import { setMeetingLocation } from "@/entities/room/api/set-meeting-location";
 import { NaverMap, type MapMarker } from "@/widgets/naver-map";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { cn } from "@/shared/lib/utils";
@@ -91,6 +93,29 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   useEffect(() => {
     void runRecommendation();
   }, [runRecommendation]);
+
+  // 장소 선택 → 즉시 모임 장소로 확정하고 큐레이션 안내 화면으로 이동.
+  // 추천 결과엔 도로명 주소 데이터가 없어 category를 fallback으로 사용한다.
+  const handleSelectPlace = useCallback(
+    async (place: RecommendedPlace) => {
+      setSelectedPlaceId(place.id);
+      try {
+        await setMeetingLocation({
+          code: roomCode,
+          location: {
+            label: place.name,
+            roadAddress: place.category ?? place.name,
+            lat: place.lat,
+            lng: place.lng,
+          },
+        });
+        router.push(`/rooms/${roomCode}/curation`);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "장소 저장에 실패했어요.");
+      }
+    },
+    [roomCode, router],
+  );
 
   const focusedPlace = useMemo(
     () =>
@@ -302,7 +327,7 @@ export function PlaceRecommendationView({ roomCode }: Props) {
                   rank={i + 1}
                   focused={p.id === focusedPlace.id}
                   selected={p.id === selectedPlaceId}
-                  onSelect={() => setSelectedPlaceId(p.id)}
+                  onSelect={() => handleSelectPlace(p)}
                 />
               </div>
             ))}
