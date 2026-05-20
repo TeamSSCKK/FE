@@ -5,19 +5,57 @@ import { MapPin } from "lucide-react";
 import { env } from "@/shared/config/env";
 import { cn } from "@/shared/lib/utils";
 import { loadNaverMapScript } from "../lib/load-script";
-import type { NaverMapProps } from "../model/types";
+import type { MapMarker, NaverMapProps } from "../model/types";
 
 // 사용자 조작과 프로그래매틱 이동을 가르는 좌표 노이즈 임계값 (약 0.1m)
 const EPS = 1e-6;
+
+function escapeHtml(s: string): string {
+  const map: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return s.replace(/[&<>"']/g, (c) => map[c]);
+}
+
+/** 마커 variant별 HTML 콘텐츠 — 가변 폭에도 좌표 점 중심에 오도록 감싼다. */
+function buildMarkerContent(mk: MapMarker): string {
+  const label = escapeHtml(mk.label);
+  const inner =
+    mk.variant === "member"
+      ? `<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-500 text-[10px] font-bold text-white ring-2 ring-white shadow">${label}</div>`
+      : mk.variant === "place-focused"
+        ? `<div class="whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-[12px] font-bold text-white shadow-lg">${label}</div>`
+        : `<div class="whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-primary ring-1 ring-primary/40 shadow-md">${label}</div>`;
+  const cursor = mk.onClick ? "pointer" : "default";
+  return `<div style="position:relative;"><div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);cursor:${cursor};">${inner}</div></div>`;
+}
+
+function markerZIndex(variant: MapMarker["variant"]): number {
+  return variant === "place-focused" ? 200 : variant === "place" ? 100 : 50;
+}
+
+/** 마커의 시각 속성 시그니처 — 변경 여부 판별용 */
+function markerSig(mk: MapMarker): string {
+  return `${mk.variant}|${mk.label}|${mk.lat}|${mk.lng}`;
+}
 
 export function NaverMap({
   center,
   onMapIdle,
   onReady,
   className,
+  markers = [],
+  showCenterPin = true,
 }: NaverMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
+  const markersRef = useRef<
+    Map<string, { marker: any; listener: any; sig: string }>
+  >(new Map());
   const onReadyRef = useRef(onReady);
   const centerRef = useRef(center);
   const onMapIdleRef = useRef(onMapIdle);
@@ -181,6 +219,77 @@ export function NaverMap({
     });
   }, [isReady, center.lat, center.lng]);
 
+  // 마커 렌더링 — id 기준 diffing.
+  // 전체 재생성을 피해, 사라진 마커만 제거 / 새것만 생성 / 변경된 것만 갱신한다.
+  // (스크롤 중 멤버 마커가 깜빡이거나 불필요하게 재생성되는 것을 방지)
+  useEffect(() => {
+    if (!isReady || !mapRef.current) return;
+    const { naver } = window;
+    const map = mapRef.current;
+    const store = markersRef.current;
+    const nextIds = new Set(markers.map((m) => m.id));
+
+    // 사라진 마커 제거
+    store.forEach((entry, id) => {
+      if (!nextIds.has(id)) {
+        if (entry.listener) naver.maps.Event.removeListener(entry.listener);
+        entry.marker.setMap(null);
+        store.delete(id);
+      }
+    });
+
+    markers.forEach((mk) => {
+      const sig = markerSig(mk);
+      const existing = store.get(mk.id);
+      if (existing) {
+        // 시각 속성은 시그니처가 바뀐 경우에만 갱신 → 멤버 마커는 깜빡임 없음
+        if (existing.sig !== sig) {
+          existing.marker.setPosition(new naver.maps.LatLng(mk.lat, mk.lng));
+          existing.marker.setIcon({
+            content: buildMarkerContent(mk),
+            anchor: new naver.maps.Point(0, 0),
+          });
+          existing.marker.setZIndex(markerZIndex(mk.variant));
+          existing.sig = sig;
+        }
+        // onClick은 매 렌더 새 클로저 — 리스너만 가볍게 교체 (DOM 변화 없음)
+        if (existing.listener) naver.maps.Event.removeListener(existing.listener);
+        existing.listener = mk.onClick
+          ? naver.maps.Event.addListener(existing.marker, "click", mk.onClick)
+          : null;
+      } else {
+        const marker = new naver.maps.Marker({
+          position: new naver.maps.LatLng(mk.lat, mk.lng),
+          map,
+          icon: {
+            content: buildMarkerContent(mk),
+            anchor: new naver.maps.Point(0, 0),
+          },
+          zIndex: markerZIndex(mk.variant),
+        });
+        const listener = mk.onClick
+          ? naver.maps.Event.addListener(marker, "click", mk.onClick)
+          : null;
+        store.set(mk.id, { marker, listener, sig });
+      }
+    });
+  }, [isReady, markers]);
+
+  // 언마운트 시 전체 마커·리스너 정리
+  useEffect(() => {
+    const store = markersRef.current;
+    return () => {
+      const naver = window.naver;
+      store.forEach((entry) => {
+        if (entry.listener && naver) {
+          naver.maps.Event.removeListener(entry.listener);
+        }
+        entry.marker.setMap(null);
+      });
+      store.clear();
+    };
+  }, []);
+
   if (loadError) {
     return (
       <div
@@ -199,15 +308,19 @@ export function NaverMap({
       <div ref={containerRef} className="naver-map h-full w-full" />
       {/* 센터 핀 — 화면 정중앙 고정. pointer-events-none으로 지도 드래그를 막지 않는다.
           -translate-y-full로 핀 하단 꼭지점이 지도 중심을 가리키게 한다. */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-full">
-        <MapPin
-          className="h-9 w-9 fill-primary text-primary drop-shadow-md"
-          strokeWidth={1.5}
-          aria-hidden
-        />
-      </div>
-      {/* 핀이 정확히 가리키는 좌표를 표시하는 정밀 앵커 — 검은 점 + 흰 링 */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white" />
+      {showCenterPin && (
+        <>
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-full">
+            <MapPin
+              className="h-9 w-9 fill-primary text-primary drop-shadow-md"
+              strokeWidth={1.5}
+              aria-hidden
+            />
+          </div>
+          {/* 핀이 정확히 가리키는 좌표를 표시하는 정밀 앵커 — 검은 점 + 흰 링 */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black ring-1 ring-white" />
+        </>
+      )}
     </div>
   );
 }
