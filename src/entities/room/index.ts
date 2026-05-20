@@ -5,6 +5,12 @@ export {
   deleteMember,
   updateMemberLocation,
 } from "./api/fetch-room-status";
+export { fetchMyRooms } from "./api/fetch-my-rooms";
+export {
+  addJoinedCode,
+  getJoinedCodes,
+  removeJoinedCode,
+} from "./lib/joined-rooms-storage";
 export type {
   Room,
   RoomCode,

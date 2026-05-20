@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { joinRoom, Member } from "@/entities/room"; // ✅ Member 임포트
+import { joinRoom, addJoinedCode, Member } from "@/entities/room"; // ✅ Member 임포트
 
 interface RoomJoinState {
   name: string;
@@ -54,6 +54,7 @@ export const useRoomJoinStore = create<RoomJoinState>((set, get) => ({
     try {
       const { name, password } = get();
       const result = await joinRoom({ code: roomCode, name, password });
+      addJoinedCode(roomCode);
       set({ isSubmitting: false });
       return result;
     } catch (e: any) {
