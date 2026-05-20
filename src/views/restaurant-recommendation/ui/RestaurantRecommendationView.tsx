@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import { fetchRoomStatus } from "@/entities/room";
+import { useHostGuard } from "@/entities/room";
 import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
 import type { RecommendedRestaurant } from "@/entities/restaurant-recommendation/model/types";
-import { loadMemberId } from "@/shared/lib/room-session";
 import { cn } from "@/shared/lib/utils";
 
 interface Props {
@@ -17,51 +16,30 @@ type Phase = "loading" | "success" | "error";
 
 export function RestaurantRecommendationView({ code }: Props) {
   const router = useRouter();
+  const { isReady: isHostReady, error: guardError } = useHostGuard(code);
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restaurants, setRestaurants] = useState<RecommendedRestaurant[]>([]);
 
-  const isMounted = useRef(true);
+  // 가드 통과 후에만 추천 fetch 실행. 멤버/게스트는 훅이 이미 리다이렉트한 상태.
   useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  // 호스트만 접근 가능 — 멤버/게스트는 모임 현황으로 돌려보낸다.
-  useEffect(() => {
+    if (!isHostReady) return;
     let canceled = false;
 
     (async () => {
       try {
-        const memberId = loadMemberId(code);
-        if (!memberId) {
-          if (!canceled) router.replace(`/rooms/${code}`);
-          return;
-        }
-        const status = await fetchRoomStatus(code);
-        if (canceled) return;
-        const me = status.members.find((m) => m.id === memberId);
-        if (!me?.isHost) {
-          router.replace(`/rooms/${code}`);
-          return;
-        }
-        // 추천 시뮬레이션 — 실제 API 연동 전 mock 지연
-        await new Promise((r) => setTimeout(r, 1200));
-        if (!isMounted.current || canceled) return;
         const result = await fetchRestaurantRecommendation(code);
         if (canceled) return;
         if (result.restaurants.length === 0) {
-          setErrorMessage("추천할 수 있는 식당이 없어요.");
           setPhase("error");
+          setErrorMessage("추천할 수 있는 식당이 없어요.");
           return;
         }
         setRestaurants(result.restaurants);
         setPhase("success");
       } catch (e) {
-        console.error("restaurant recommendation guard error", e);
+        console.error("restaurant recommendation fetch error", e);
         if (canceled) return;
         setErrorMessage("식당 추천 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
         setPhase("error");
@@ -71,7 +49,15 @@ export function RestaurantRecommendationView({ code }: Props) {
     return () => {
       canceled = true;
     };
-  }, [code, router]);
+  }, [code, isHostReady]);
+
+  // 가드 단계에서 네트워크 실패가 발생한 경우 에러 화면으로 전이
+  useEffect(() => {
+    if (guardError) {
+      setErrorMessage(guardError);
+      setPhase("error");
+    }
+  }, [guardError]);
 
   const totalCount = restaurants.length;
   const current = useMemo(

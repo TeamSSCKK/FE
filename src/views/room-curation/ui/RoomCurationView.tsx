@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Map } from "lucide-react";
-import { fetchRoomStatus, type Room } from "@/entities/room";
-import { loadMemberId } from "@/shared/lib/room-session";
+import { useHostGuard } from "@/entities/room";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 
 interface Props {
@@ -38,50 +37,8 @@ function CurationCard({ caption, title, delay, onClick }: CurationCardProps) {
 
 export function RoomCurationView({ roomCode }: Props) {
   const router = useRouter();
-  const [room, setRoom] = useState<Room | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let canceled = false;
-    async function load() {
-      try {
-        const status = await fetchRoomStatus(roomCode);
-        if (canceled) return;
-
-        // 호스트 가드 — 큐레이션 진입은 호스트 전용.
-        // memberId가 호스트와 매칭되거나, 호스트 단말(localStorage room-{code} 보유)에
-        // 아직 sessionStorage가 없는 경우에 한해 통과시킨다.
-        const memberId = loadMemberId(roomCode);
-        let isHost = false;
-        if (memberId) {
-          const me = status.members.find((m) => m.id === memberId);
-          isHost = !!me?.isHost;
-        }
-        if (
-          !isHost &&
-          typeof window !== "undefined" &&
-          localStorage.getItem(`room-${roomCode}`)
-        ) {
-          const host = status.members.find((m) => m.isHost);
-          if (host && !memberId) isHost = true;
-        }
-        if (!isHost) {
-          router.replace(`/rooms/${roomCode}`);
-          return;
-        }
-
-        setRoom(status.room);
-      } catch (e) {
-        console.error("fetchRoomStatus error", e);
-      } finally {
-        if (!canceled) setIsLoading(false);
-      }
-    }
-    void load();
-    return () => {
-      canceled = true;
-    };
-  }, [roomCode, router]);
+  const { status, isReady, error } = useHostGuard(roomCode);
+  const room = status?.room ?? null;
 
   // 추천 결과 화면은 아직 준비 중 — 공통 안내만 처리
   const handleNotReady = useCallback(() => {
@@ -111,7 +68,15 @@ export function RoomCurationView({ roomCode }: Props) {
     );
   }, [roomCode, router]);
 
-  if (isLoading) {
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-6 text-center">
+        <p className="text-sm text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <p className="text-sm text-muted-foreground">불러오는 중...</p>

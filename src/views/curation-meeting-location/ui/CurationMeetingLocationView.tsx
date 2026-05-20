@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import {
-  fetchRoomStatus,
-  type Room,
-  type Location,
-} from "@/entities/room";
+import { useHostGuard, type Location } from "@/entities/room";
 import { setMeetingLocation } from "@/entities/room/api/set-meeting-location";
-import { loadMemberId, saveMemberId } from "@/shared/lib/room-session";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { NaverMap, reverseGeocode } from "@/widgets/naver-map";
 import {
@@ -31,9 +26,8 @@ interface Props {
 
 export function CurationMeetingLocationView({ code }: Props) {
   const router = useRouter();
-  const [memberId, setMemberId] = useState<string | null>(null);
-  const [room, setRoom] = useState<Room | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { status, memberId, error: loadError } = useHostGuard(code);
+  const room = status?.room ?? null;
   const [mapReady, setMapReady] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -51,54 +45,6 @@ export function CurationMeetingLocationView({ code }: Props) {
   useEffect(() => {
     return () => reset();
   }, [reset]);
-
-  useEffect(() => {
-    let canceled = false;
-
-    async function bootstrap() {
-      try {
-        const status = await fetchRoomStatus(code);
-        if (canceled) return;
-        setRoom(status.room);
-
-        // 호스트 가드 — 모임 장소 결정은 호스트 전용. 멤버/게스트는 방으로 되돌린다.
-        let mid = loadMemberId(code);
-        if (!mid || !status.members.some((m) => m.id === mid)) {
-          // stale sessionStorage 또는 미진입 — 호스트 단말이면 host id 재흡수
-          const stored = localStorage.getItem(`room-${code}`);
-          if (stored) {
-            const host = status.members.find((m) => m.isHost);
-            if (host) {
-              saveMemberId(code, host.id);
-              mid = host.id;
-            }
-          }
-        }
-
-        if (!mid) {
-          router.replace(`/rooms/${code}`);
-          return;
-        }
-
-        const me = status.members.find((m) => m.id === mid);
-        if (!me?.isHost) {
-          router.replace(`/rooms/${code}`);
-          return;
-        }
-
-        setMemberId(mid);
-      } catch (e) {
-        if (!canceled) {
-          setLoadError(e instanceof Error ? e.message : "모임 정보를 불러오지 못했어요.");
-        }
-      }
-    }
-
-    void bootstrap();
-    return () => {
-      canceled = true;
-    };
-  }, [code, router]);
 
   // 지도 모드 진입 + 지도 ready + selected 없을 때 1회 자동 GPS
   useEffect(() => {
