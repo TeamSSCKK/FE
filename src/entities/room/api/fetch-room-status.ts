@@ -8,7 +8,7 @@ import type { RoomStatus, Member, Location } from "../model/types";
 // 탭 간 동기화 + 새로고침 유지가 되도록 한다. (기기 간 동기화는 백엔드 필요)
 const membersKey = (code: string) => `members-${code}`;
 
-function readMembers(code: string): Member[] | null {
+export function readMembers(code: string): Member[] | null {
   const raw = localStorage.getItem(membersKey(code));
   if (!raw) return null;
   try {
@@ -18,7 +18,7 @@ function readMembers(code: string): Member[] | null {
   }
 }
 
-function writeMembers(code: string, members: Member[]): void {
+export function writeMembers(code: string, members: Member[]): void {
   localStorage.setItem(membersKey(code), JSON.stringify(members));
 }
 
@@ -60,6 +60,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       dateTime: roomData.dateTime,
       hostName: roomData.hostName,
       createdAt: roomData.createdAt,
+      meetingLocation: roomData.meetingLocation,
     },
     members,
     totalCount,

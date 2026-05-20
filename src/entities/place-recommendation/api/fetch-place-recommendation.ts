@@ -26,5 +26,50 @@ export async function fetchPlaceRecommendation(
     throw new Error("Room not found");
   }
 
-  return { places: [] };
+  return {
+    places: [
+      {
+        id: "pl1",
+        name: "용산역 4호선",
+        address: "서울 용산구 한강대로23길 55",
+        lat: 37.529,
+        lng: 126.965,
+        averageTravelTimeMinutes: 20,
+        fitScore: 97,
+        travelTimesByMember: [
+          { memberId: "m1", memberName: "준호", minutes: 18 },
+          { memberId: "m2", memberName: "지원", minutes: 20 },
+          { memberId: "m3", memberName: "신주미", minutes: 22 },
+        ],
+      },
+      {
+        id: "pl2",
+        name: "서울역 1호선",
+        address: "서울 용산구 한강대로 405",
+        lat: 37.555,
+        lng: 126.972,
+        averageTravelTimeMinutes: 25,
+        fitScore: 89,
+        travelTimesByMember: [
+          { memberId: "m1", memberName: "준호", minutes: 23 },
+          { memberId: "m2", memberName: "지원", minutes: 25 },
+          { memberId: "m3", memberName: "신주미", minutes: 27 },
+        ],
+      },
+      {
+        id: "pl3",
+        name: "이태원역 6호선",
+        address: "서울 용산구 이태원로 177",
+        lat: 37.534,
+        lng: 126.994,
+        averageTravelTimeMinutes: 22,
+        fitScore: 85,
+        travelTimesByMember: [
+          { memberId: "m1", memberName: "준호", minutes: 20 },
+          { memberId: "m2", memberName: "지원", minutes: 24 },
+          { memberId: "m3", memberName: "신주미", minutes: 22 },
+        ],
+      },
+    ],
+  };
 }

@@ -253,16 +253,26 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
             <div className="mt-4 space-y-2">
               <Button
                 onClick={() => router.push(`/rooms/${roomCode}/location`)}
-                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+                className={cn(
+                  "h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95",
+                  currentMember?.hasLocation
+                    ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    : "bg-purple-600 text-white hover:bg-purple-700",
+                )}
               >
-                위치 입력하기
+                {currentMember?.hasLocation ? "위치 수정하기" : "위치 입력하기"}
               </Button>
               <Button
-                onClick={handleNotReady}
+                onClick={() => router.push(`/rooms/${roomCode}/preference`)}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+                className={cn(
+                  "h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95",
+                  currentMember?.hasPreference
+                    ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    : "bg-purple-600 text-white hover:bg-purple-700",
+                )}
               >
-                취향 입력하기
+                {currentMember?.hasPreference ? "취향 수정하기" : "취향 입력하기"}
               </Button>
               <Button
                 onClick={handleNotReady}
@@ -276,16 +286,26 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
             <div className="mt-4 space-y-2">
               <Button
                 onClick={() => router.push(`/rooms/${roomCode}/location`)}
-                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+                className={cn(
+                  "h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95",
+                  currentMember?.hasLocation
+                    ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    : "bg-purple-600 text-white hover:bg-purple-700",
+                )}
               >
-                위치 수정하기
+                {currentMember?.hasLocation ? "위치 수정하기" : "위치 입력하기"}
               </Button>
               <Button
-                onClick={handleNotReady}
+                onClick={() => router.push(`/rooms/${roomCode}/preference`)}
                 variant="secondary"
-                className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+                className={cn(
+                  "h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95",
+                  currentMember?.hasPreference
+                    ? "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    : "bg-purple-600 text-white hover:bg-purple-700",
+                )}
               >
-                취향 수정하기
+                {currentMember?.hasPreference ? "취향 수정하기" : "취향 입력하기"}
               </Button>
               <Button
                 onClick={handleNotReady}

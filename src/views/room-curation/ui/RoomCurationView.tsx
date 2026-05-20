@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Map } from "lucide-react";
 import { fetchRoomStatus, type Room } from "@/entities/room";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
+import { loadMemberId } from "@/shared/lib/room-session";
 
 interface Props {
   roomCode: string;
@@ -45,7 +46,28 @@ export function RoomCurationView({ roomCode }: Props) {
     async function load() {
       try {
         const status = await fetchRoomStatus(roomCode);
-        if (!canceled) setRoom(status.room);
+        if (canceled) return;
+
+        const memberId = loadMemberId(roomCode);
+        let isHost = false;
+        if (memberId) {
+          const me = status.members.find((m) => m.id === memberId);
+          isHost = !!me?.isHost;
+        }
+        if (
+          !isHost &&
+          typeof window !== "undefined" &&
+          localStorage.getItem(`room-${roomCode}`)
+        ) {
+          const host = status.members.find((m) => m.isHost);
+          if (host && !memberId) isHost = true;
+        }
+        if (!isHost) {
+          router.replace(`/rooms/${roomCode}`);
+          return;
+        }
+
+        setRoom(status.room);
       } catch (e) {
         console.error("fetchRoomStatus error", e);
       } finally {
@@ -56,12 +78,15 @@ export function RoomCurationView({ roomCode }: Props) {
     return () => {
       canceled = true;
     };
-  }, [roomCode]);
+  }, [roomCode, router]);
 
-  // 추천 결과 화면은 아직 준비 중 — 공통 안내만 처리
-  const handleNotReady = useCallback(() => {
-    alert("해당 기능은 준비 중입니다!");
-  }, []);
+  const handleRestaurantClick = () => {
+    if (room?.meetingLocation) {
+      router.push(`/rooms/${roomCode}/curation/restaurant`);
+    } else {
+      router.push(`/rooms/${roomCode}/curation/restaurant-location`);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -118,7 +143,7 @@ export function RoomCurationView({ roomCode }: Props) {
             caption="저희는 이미 장소를 정했어요."
             title="모임 식당 추천"
             delay={240}
-            onClick={handleNotReady}
+            onClick={handleRestaurantClick}
           />
         </div>
       </div>

@@ -18,6 +18,26 @@ export interface Room {
   dateTime: string;
   hostName: string;
   createdAt: string;
+  /** 호스트가 큐레이션 단계에서 확정한 모임 장소 */
+  meetingLocation?: Location;
+}
+
+export type PreferenceTone = "like" | "dislike";
+
+export interface PreferenceTagInput {
+  id: string;
+  label: string;
+  tone: PreferenceTone;
+}
+
+export interface RestrictionTagInput {
+  id: string;
+  label: string;
+}
+
+export interface MemberPreference {
+  tags: PreferenceTagInput[];
+  restrictions: RestrictionTagInput[];
 }
 
 /**
@@ -56,6 +76,8 @@ export interface Member {
   locationLabel?: string;
   /** 본인이 입력한 출발지 (좌표 + 주소) */
   location?: Location;
+  /** 본인이 입력한 음식 취향(선호/비선호/제한) */
+  preference?: MemberPreference;
 }
 
 /**

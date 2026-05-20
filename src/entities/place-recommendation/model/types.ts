@@ -1,11 +1,22 @@
 /**
  * 추천 장소 1건.
- * 결과 화면이 아직 미구현이라 최소 필드만 둔다 —
- * 백엔드 스키마 확정 시 좌표·주소·점수 등으로 확장한다.
+ * Phase 2 백엔드 연동 시 DTO 변환 레이어 추가 예정.
  */
+export interface MemberTravelTime {
+  memberId: string;
+  memberName: string;
+  minutes: number;
+}
+
 export interface RecommendedPlace {
   id: string;
   name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  averageTravelTimeMinutes: number;
+  fitScore: number;
+  travelTimesByMember: MemberTravelTime[];
 }
 
 /** 장소 추천 결과 */

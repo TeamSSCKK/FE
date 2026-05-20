@@ -2,9 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MapPin, AlertTriangle } from "lucide-react";
-import { fetchRoomStatus, type Room } from "@/entities/room";
-import { fetchPlaceRecommendation } from "@/entities/place-recommendation";
+import {
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  fetchRoomStatus,
+  setMeetingLocation,
+  type Room,
+} from "@/entities/room";
+import {
+  fetchPlaceRecommendation,
+  type PlaceRecommendationResult,
+} from "@/entities/place-recommendation";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { Button } from "@/shared/ui/button";
 
@@ -35,6 +47,8 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   const [room, setRoom] = useState<Room | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [result, setResult] = useState<PlaceRecommendationResult | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   // 언마운트 이후 비동기 응답이 setState를 건드리지 않도록 막는다.
   // strict mode 재마운트 대비로 setup에서 true를 다시 세팅한다.
@@ -64,8 +78,10 @@ export function PlaceRecommendationView({ roomCode }: Props) {
     setPhase("loading");
     setErrorMessage(null);
     try {
-      await fetchPlaceRecommendation(roomCode);
+      const data = await fetchPlaceRecommendation(roomCode);
       if (!isMounted.current) return;
+      setResult(data);
+      setCurrentIndex(0);
       setPhase("success");
     } catch (e) {
       // 백엔드 raw 메시지 대신 사용자용 한국어 메시지로 통일
@@ -79,6 +95,25 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   useEffect(() => {
     void runRecommendation();
   }, [runRecommendation]);
+
+  const handleSelectPlace = async () => {
+    const place = result?.places[currentIndex];
+    if (!place) return;
+    try {
+      await setMeetingLocation({
+        code: roomCode,
+        location: {
+          label: place.name,
+          roadAddress: place.address,
+          lat: place.lat,
+          lng: place.lng,
+        },
+      });
+      router.push(`/rooms/${roomCode}/curation`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "저장 실패");
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -136,16 +171,148 @@ export function PlaceRecommendationView({ roomCode }: Props) {
           </div>
         )}
 
-        {phase === "success" && (
+        {phase === "success" && result && result.places.length === 0 && (
           <div className="animate-fade-up rounded-2xl bg-primary/[0.05] px-8 py-10 text-center">
             <p className="text-base font-semibold text-gray-900">
-              추천이 완료되었어요
+              추천 결과가 없어요
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              추천 결과 화면은 준비 중입니다.
+              조건을 만족하는 장소를 찾지 못했어요.
             </p>
           </div>
         )}
+
+        {phase === "success" &&
+          result &&
+          result.places.length > 0 &&
+          (() => {
+            const place = result.places[currentIndex];
+            const maxMinutes = Math.max(
+              ...place.travelTimesByMember.map((t) => t.minutes),
+            );
+            return (
+              <div className="animate-fade-up flex w-full flex-col gap-4 self-start pb-28">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    모두가 만나기 좋은 지역은 여기예요.
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    어떤 장소가 가장 마음에 드시나요?
+                  </p>
+                </div>
+
+                <div className="relative flex h-48 items-center justify-center overflow-hidden rounded-2xl bg-gray-200">
+                  <MapPin
+                    className="absolute left-8 top-8 text-gray-500"
+                    size={28}
+                  />
+                  <MapPin
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-700"
+                    size={32}
+                  />
+                  <MapPin
+                    className="absolute bottom-8 right-8 text-gray-500"
+                    size={28}
+                  />
+                  <span className="absolute bottom-2 text-xs text-gray-400">
+                    지도 영역 (추후 네이버 지도 API 연동)
+                  </span>
+                </div>
+
+                <div className="flex justify-center gap-2">
+                  {result.places.map((_, i) => (
+                    <div
+                      key={i}
+                      className={
+                        i === currentIndex
+                          ? "h-2 w-2 rounded-full bg-purple-600"
+                          : "h-2 w-2 rounded-full bg-gray-300"
+                      }
+                    />
+                  ))}
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentIndex((i) => Math.max(0, i - 1))
+                    }
+                    disabled={currentIndex === 0}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 disabled:opacity-30"
+                    aria-label="이전"
+                  >
+                    <ChevronLeft size={28} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentIndex((i) =>
+                        Math.min(result.places.length - 1, i + 1),
+                      )
+                    }
+                    disabled={currentIndex === result.places.length - 1}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 disabled:opacity-30"
+                    aria-label="다음"
+                  >
+                    <ChevronRight size={28} />
+                  </button>
+
+                  <div className="px-10">
+                    <p className="text-xs text-gray-500">
+                      추천 장소 {currentIndex + 1}
+                    </p>
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      {place.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      평균 이동 {place.averageTravelTimeMinutes}분 · 적합도{" "}
+                      {place.fitScore}%
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {place.address}
+                    </p>
+
+                    <div className="mt-4 rounded-xl bg-purple-50 p-4">
+                      <p className="mb-3 text-sm font-medium">
+                        참가자별 이동시간
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {place.travelTimesByMember.map((t) => (
+                          <div
+                            key={t.memberId}
+                            className="flex items-center gap-3"
+                          >
+                            <span className="w-16 text-sm">{t.memberName}</span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
+                              <div
+                                className="h-full bg-purple-600"
+                                style={{
+                                  width: `${(t.minutes / maxMinutes) * 100}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="w-12 text-right text-sm text-gray-700">
+                              {t.minutes}분
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="fixed bottom-0 left-0 right-0 mx-auto max-w-md border-t bg-white px-5 py-4">
+                  <Button
+                    onClick={handleSelectPlace}
+                    className="h-12 w-full rounded-2xl bg-purple-600 text-sm font-semibold text-white hover:bg-purple-700 active:scale-[0.97]"
+                  >
+                    이 위치로 정하기
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
       </div>
 
       {/* 하단 안내 — 로딩 중에만 */}
