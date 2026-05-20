@@ -18,6 +18,8 @@ export interface Room {
   dateTime: string;
   hostName: string;
   createdAt: string;
+  /** 호스트가 큐레이션 단계에서 정한 모임 장소 (미설정 시 undefined) */
+  meetingLocation?: Location;
 }
 
 /**

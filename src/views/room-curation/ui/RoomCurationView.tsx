@@ -47,26 +47,13 @@ export function RoomCurationView({ roomCode }: Props) {
 
   // 모임 식당 추천 — 모임 장소가 이미 정해져 있으면 추천 화면으로,
   // 아니면 장소 입력 단계부터 보낸다.
-  // (`Room` 타입에 meetingLocation이 없어 localStorage를 직접 본다.
-  //  데이터 출처는 setMeetingLocation이 쓰는 그곳과 동일하다.)
   const handleRestaurantClick = useCallback(() => {
-    let hasMeetingLocation = false;
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem(`room-${roomCode}`);
-      if (raw) {
-        try {
-          hasMeetingLocation = !!JSON.parse(raw).meetingLocation;
-        } catch {
-          // 손상된 데이터는 미설정으로 간주한다.
-        }
-      }
-    }
     router.push(
-      hasMeetingLocation
+      room?.meetingLocation
         ? `/rooms/${roomCode}/curation/restaurant`
         : `/rooms/${roomCode}/curation/restaurant-location`,
     );
-  }, [roomCode, router]);
+  }, [roomCode, router, room?.meetingLocation]);
 
   if (error) {
     return (
