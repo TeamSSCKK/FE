@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createRoom } from "@/entities/room";
+import { createRoom, addJoinedCode } from "@/entities/room";
 
 export type WizardStep = 1 | 2 | 3 | 4;
 
@@ -59,6 +59,7 @@ export const useRoomCreateStore = create<RoomCreateState>((set, get) => ({
     try {
       const { name, dateTime, hostName, password } = get();
       const result = await createRoom({ name, dateTime, hostName, password });
+      addJoinedCode(result.code);
       set({ roomCode: result.code, step: 4, isSubmitting: false });
     } catch (e) {
       console.error("createRoom failed", e);
