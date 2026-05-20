@@ -19,6 +19,8 @@ export async function setMeetingLocation(
   if (!raw) throw new Error("Room not found");
 
   const roomData = JSON.parse(raw);
-  roomData.meetingLocation = input.location;
-  localStorage.setItem(`room-${input.code}`, JSON.stringify(roomData));
+  if (roomData && typeof roomData === "object" && !Array.isArray(roomData)) {
+    roomData.meetingLocation = input.location;
+    localStorage.setItem(`room-${input.code}`, JSON.stringify(roomData));
+  }
 }
