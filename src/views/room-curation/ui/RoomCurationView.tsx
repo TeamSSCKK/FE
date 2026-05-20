@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Map } from "lucide-react";
 import { fetchRoomStatus, type Room } from "@/entities/room";
+import { loadMemberId } from "@/shared/lib/room-session";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 
 interface Props {
@@ -45,7 +46,31 @@ export function RoomCurationView({ roomCode }: Props) {
     async function load() {
       try {
         const status = await fetchRoomStatus(roomCode);
-        if (!canceled) setRoom(status.room);
+        if (canceled) return;
+
+        // 호스트 가드 — 큐레이션 진입은 호스트 전용.
+        // memberId가 호스트와 매칭되거나, 호스트 단말(localStorage room-{code} 보유)에
+        // 아직 sessionStorage가 없는 경우에 한해 통과시킨다.
+        const memberId = loadMemberId(roomCode);
+        let isHost = false;
+        if (memberId) {
+          const me = status.members.find((m) => m.id === memberId);
+          isHost = !!me?.isHost;
+        }
+        if (
+          !isHost &&
+          typeof window !== "undefined" &&
+          localStorage.getItem(`room-${roomCode}`)
+        ) {
+          const host = status.members.find((m) => m.isHost);
+          if (host && !memberId) isHost = true;
+        }
+        if (!isHost) {
+          router.replace(`/rooms/${roomCode}`);
+          return;
+        }
+
+        setRoom(status.room);
       } catch (e) {
         console.error("fetchRoomStatus error", e);
       } finally {
@@ -56,12 +81,35 @@ export function RoomCurationView({ roomCode }: Props) {
     return () => {
       canceled = true;
     };
-  }, [roomCode]);
+  }, [roomCode, router]);
 
   // 추천 결과 화면은 아직 준비 중 — 공통 안내만 처리
   const handleNotReady = useCallback(() => {
     alert("해당 기능은 준비 중입니다!");
   }, []);
+
+  // 모임 식당 추천 — 모임 장소가 이미 정해져 있으면 추천 화면으로,
+  // 아니면 장소 입력 단계부터 보낸다.
+  // (`Room` 타입에 meetingLocation이 없어 localStorage를 직접 본다.
+  //  데이터 출처는 setMeetingLocation이 쓰는 그곳과 동일하다.)
+  const handleRestaurantClick = useCallback(() => {
+    let hasMeetingLocation = false;
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem(`room-${roomCode}`);
+      if (raw) {
+        try {
+          hasMeetingLocation = !!JSON.parse(raw).meetingLocation;
+        } catch {
+          // 손상된 데이터는 미설정으로 간주한다.
+        }
+      }
+    }
+    router.push(
+      hasMeetingLocation
+        ? `/rooms/${roomCode}/curation/restaurant`
+        : `/rooms/${roomCode}/curation/restaurant-location`,
+    );
+  }, [roomCode, router]);
 
   if (isLoading) {
     return (
@@ -118,7 +166,7 @@ export function RoomCurationView({ roomCode }: Props) {
             caption="저희는 이미 장소를 정했어요."
             title="모임 식당 추천"
             delay={240}
-            onClick={handleNotReady}
+            onClick={handleRestaurantClick}
           />
         </div>
       </div>
