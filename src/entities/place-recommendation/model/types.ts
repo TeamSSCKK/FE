@@ -21,6 +21,11 @@ export interface RecommendedPlace {
   memberTravels: MemberTravel[];
   /** 멤버 평균 이동 시간(분) */
   averageMinutes: number;
+  maxMinutes?: number;
+  standardDeviation?: number;
+  fairnessScore?: number;
+  rank?: number;
+  address?: string;
 }
 
 /** 추천 근거가 된 멤버 출발지 — 지도 마커 표시용 */
@@ -33,6 +38,7 @@ export interface MemberOrigin {
 
 /** 장소 추천 결과 */
 export interface PlaceRecommendationResult {
+  calculationMethod?: "ODSAY" | "DISTANCE_FALLBACK";
   places: RecommendedPlace[];
   origins: MemberOrigin[];
 }
