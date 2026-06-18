@@ -45,8 +45,13 @@ export async function fetchRestaurantRecommendation(
   const mapped: RecommendedRestaurant[] = restaurants.map((r) => ({
     id: r.id,
     name: r.name,
+    // distanceMeters만 오므로 도보 분속(~78m/분)으로 근사 환산한다.
     travelTimeMinutes: r.distanceMeters ? Math.round(r.distanceMeters / 78) : 0,
-    fitScore: r.preferenceScore != null ? Math.round(r.preferenceScore * 100) : 0,
+    // preferenceScore는 이미 0~100 적합도 점수다. *100 하지 않고 0~100으로 clamp.
+    fitScore:
+      r.preferenceScore != null
+        ? Math.min(100, Math.max(0, Math.round(r.preferenceScore)))
+        : 0,
     naverMapUrl: r.sourceUrl ?? "",
     kakaoMapUrl: "",
     tags: r.matchedLikes ?? [],
