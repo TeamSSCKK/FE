@@ -3,8 +3,14 @@ import { env } from "@/shared/config/env";
 
 export const apiClient = axios.create({
   baseURL: env.API_URL,
-  timeout: 10_000,
-  withCredentials: true,
+  timeout: 60_000,
+  withCredentials: false,
+  headers: env.SUPABASE_ANON_KEY
+    ? {
+        apikey: env.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+      }
+    : undefined,
 });
 
 apiClient.interceptors.response.use(
