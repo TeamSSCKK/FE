@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { useHostGuard } from "@/entities/room";
 import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
-import type { RecommendedRestaurant } from "@/entities/restaurant-recommendation/model/types";
+import type {
+  ConfirmedPlace,
+  RecommendedRestaurant,
+} from "@/entities/restaurant-recommendation/model/types";
+import { NaverMap, type MapMarker } from "@/widgets/naver-map";
 import { cn } from "@/shared/lib/utils";
 
 interface Props {
@@ -21,6 +25,7 @@ export function RestaurantRecommendationView({ code }: Props) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restaurants, setRestaurants] = useState<RecommendedRestaurant[]>([]);
+  const [confirmedPlace, setConfirmedPlace] = useState<ConfirmedPlace | null>(null);
 
   // 가드 통과 후에만 추천 fetch 실행. 멤버/게스트는 훅이 이미 리다이렉트한 상태.
   useEffect(() => {
@@ -36,6 +41,7 @@ export function RestaurantRecommendationView({ code }: Props) {
           setErrorMessage("추천할 수 있는 식당이 없어요.");
           return;
         }
+        setConfirmedPlace(result.place ?? null);
         setRestaurants(result.restaurants);
         setPhase("success");
       } catch (e) {
@@ -64,6 +70,40 @@ export function RestaurantRecommendationView({ code }: Props) {
     () => restaurants[activeIndex],
     [restaurants, activeIndex],
   );
+
+  const markers = useMemo<MapMarker[]>(() => {
+    const list: MapMarker[] = [];
+    if (confirmedPlace) {
+      list.push({
+        id: "meeting-place",
+        lat: confirmedPlace.lat,
+        lng: confirmedPlace.lng,
+        variant: "member",
+        label: confirmedPlace.name.charAt(0),
+      });
+    }
+    restaurants.forEach((r, i) => {
+      if (r.lat == null || r.lng == null) return;
+      list.push({
+        id: r.id,
+        lat: r.lat,
+        lng: r.lng,
+        variant: i === activeIndex ? "place-focused" : "place",
+        label: r.name,
+      });
+    });
+    return list;
+  }, [confirmedPlace, restaurants, activeIndex]);
+
+  const mapCenter = useMemo(() => {
+    if (current?.lat != null && current?.lng != null) {
+      return { lat: current.lat, lng: current.lng };
+    }
+    if (confirmedPlace) {
+      return { lat: confirmedPlace.lat, lng: confirmedPlace.lng };
+    }
+    return null;
+  }, [current, confirmedPlace]);
 
   const handlePrev = () => {
     setActiveIndex((i) => (i - 1 + totalCount) % totalCount);
@@ -150,12 +190,21 @@ export function RestaurantRecommendationView({ code }: Props) {
         </p>
       </div>
 
-      <div className="mx-5 mt-4 flex h-[40vh] flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-neutral-100">
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <MapPin className="h-8 w-8" />
-          <p className="text-xs">지도 영역</p>
-          <p className="text-[11px]">도보 {current.travelTimeMinutes}분</p>
-        </div>
+      <div className="mx-5 mt-4 h-[40vh] flex-shrink-0 overflow-hidden rounded-2xl bg-neutral-100">
+        {mapCenter ? (
+          <NaverMap
+            center={mapCenter}
+            markers={markers}
+            showCenterPin={false}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <MapPin className="h-8 w-8" />
+              <p className="text-xs">지도 정보 없음</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex justify-center gap-1.5">
