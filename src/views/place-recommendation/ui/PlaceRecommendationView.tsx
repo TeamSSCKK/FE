@@ -74,12 +74,12 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   const runRecommendation = useCallback(async () => {
     setPhase("loading");
     setErrorMessage(null);
+    setSelectedPlaceId(null);
     try {
       const res = await fetchPlaceRecommendation(roomCode);
       if (!isMounted.current) return;
       setResult(res);
       setFocusedPlaceId(res.places[0]?.id ?? null);
-      setSelectedPlaceId(null);
       setPhase("success");
     } catch (e) {
       // 백엔드 raw 메시지 대신 사용자용 한국어 메시지로 통일
@@ -100,6 +100,10 @@ export function PlaceRecommendationView({ roomCode }: Props) {
     async (place: RecommendedPlace) => {
       setSelectedPlaceId(place.id);
       try {
+        // 식당 추천 시 사용할 place.id를 localStorage에 저장
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`moyeo_place_${roomCode}`, place.id);
+        }
         await setMeetingLocation({
           code: roomCode,
           location: {
@@ -112,6 +116,7 @@ export function PlaceRecommendationView({ roomCode }: Props) {
         router.push(`/rooms/${roomCode}/curation`);
       } catch (e) {
         alert(e instanceof Error ? e.message : "장소 저장에 실패했어요.");
+        setSelectedPlaceId(null);
       }
     },
     [roomCode, router],
@@ -327,7 +332,7 @@ export function PlaceRecommendationView({ roomCode }: Props) {
                   rank={i + 1}
                   focused={p.id === focusedPlace.id}
                   selected={p.id === selectedPlaceId}
-                  onSelect={() => handleSelectPlace(p)}
+                  onSelect={() => void handleSelectPlace(p)}
                 />
               </div>
             ))}

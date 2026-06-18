@@ -9,7 +9,7 @@ import {
   type Room,
   type Location,
 } from "@/entities/room";
-import { loadMemberId, saveMemberId } from "@/shared/lib/room-session";
+import { loadMemberId } from "@/shared/lib/room-session";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { NaverMap, reverseGeocode } from "@/widgets/naver-map";
 import {
@@ -70,18 +70,7 @@ export function RoomLocationView({ roomCode }: Props) {
           return;
         }
 
-        // sessionStorage가 없거나 stale → host 재흡수.
-        // localStorage에 room-{code}가 있다면 이 단말이 방 생성자
-        const stored = localStorage.getItem(`room-${roomCode}`);
-        if (stored) {
-          const host = status.members.find((m) => m.isHost);
-          if (host) {
-            saveMemberId(roomCode, host.id);
-            setMemberId(host.id);
-            return;
-          }
-        }
-
+        // 세션 없음 → 방 상세로 돌아가서 참여하도록 안내
         router.replace(`/rooms/${roomCode}`);
       } catch (e) {
         if (!canceled) {

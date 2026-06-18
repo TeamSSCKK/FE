@@ -8,14 +8,12 @@ interface RoomCreateState {
   name: string;
   dateTime: string;
   hostName: string;
-  password: string;
   roomCode: string | null;
   isSubmitting: boolean;
 
   setName: (v: string) => void;
   setDateTime: (v: string) => void;
   setHostName: (v: string) => void;
-  setPassword: (v: string) => void;
 
   goToStep: (s: WizardStep) => void;
   next: () => void;
@@ -30,7 +28,6 @@ const initialState = {
   name: "",
   dateTime: "",
   hostName: "",
-  password: "",
   roomCode: null,
   isSubmitting: false,
 };
@@ -41,7 +38,6 @@ export const useRoomCreateStore = create<RoomCreateState>((set, get) => ({
   setName: (v) => set({ name: v }),
   setDateTime: (v) => set({ dateTime: v }),
   setHostName: (v) => set({ hostName: v }),
-  setPassword: (v) => set({ password: v }),
 
   goToStep: (s) => set({ step: s }),
   next: () =>
@@ -57,8 +53,8 @@ export const useRoomCreateStore = create<RoomCreateState>((set, get) => ({
     if (get().isSubmitting) return;
     set({ isSubmitting: true });
     try {
-      const { name, dateTime, hostName, password } = get();
-      const result = await createRoom({ name, dateTime, hostName, password });
+      const { name, dateTime, hostName } = get();
+      const result = await createRoom({ name, dateTime, hostName });
       addJoinedCode(result.code);
       set({ roomCode: result.code, step: 4, isSubmitting: false });
     } catch (e) {

@@ -13,8 +13,20 @@ export interface RecommendedRestaurant {
   tags: string[];
   representativeMenu: string[];
   photos: RestaurantPhoto[];
+  address?: string;
+  lat?: number;
+  lng?: number;
+  rank?: number;
+}
+
+export interface ConfirmedPlace {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
 }
 
 export interface RestaurantRecommendationResult {
+  place?: ConfirmedPlace;
   restaurants: RecommendedRestaurant[];
 }

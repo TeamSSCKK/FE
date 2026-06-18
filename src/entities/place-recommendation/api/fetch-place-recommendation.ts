@@ -1,26 +1,70 @@
 import { apiClient } from "@/shared/api/axios-instance";
-import type { PlaceRecommendationResult } from "../model/types";
+import type {
+  PlaceRecommendationResult,
+  RecommendedPlace,
+  MemberOrigin,
+  MemberTravel,
+} from "../model/types";
 
-interface PlaceRecommendationRequest {
-  inviteCode: string;
-  limit: number;
+interface BackendPlace {
+  id: string;
+  name: string;
+  category: string;
+  address?: string;
+  lat: number;
+  lng: number;
+  rank?: number;
+  averageMinutes: number;
+  maxMinutes?: number;
+  standardDeviation?: number;
+  fairnessScore?: number;
+  memberTravels: MemberTravel[];
 }
 
-/**
- * 장소 추천을 요청한다.
- * @throws 추천 도출에 실패하면 Error — 호출부에서 사용자용 메시지로 변환해 표시한다.
- */
+interface BackendOrigin {
+  memberId: string;
+  memberName: string;
+  lat: number;
+  lng: number;
+}
+
+interface RecommendPlacesResponse {
+  calculationMethod: string;
+  places: BackendPlace[];
+  origins: BackendOrigin[];
+}
+
 export async function fetchPlaceRecommendation(
   code: string,
 ): Promise<PlaceRecommendationResult> {
-  const request: PlaceRecommendationRequest = {
-    inviteCode: code,
-    limit: 5,
-  };
-
-  const { data } = await apiClient.post<PlaceRecommendationResult>(
-    "/recommend-places",
-    request,
+  const response = await apiClient.post<RecommendPlacesResponse>(
+    "/functions/v1/recommend-places",
+    { inviteCode: code },
   );
-  return data;
+
+  const { calculationMethod, places, origins } = response.data;
+
+  const mappedPlaces: RecommendedPlace[] = places.map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category ?? "",
+    address: p.address,
+    lat: p.lat,
+    lng: p.lng,
+    memberTravels: p.memberTravels ?? [],
+    averageMinutes: p.averageMinutes,
+    maxMinutes: p.maxMinutes,
+    standardDeviation: p.standardDeviation,
+    fairnessScore: p.fairnessScore,
+    rank: p.rank,
+  }));
+
+  const mappedOrigins: MemberOrigin[] = origins.map((o) => ({
+    memberId: o.memberId,
+    memberName: o.memberName,
+    lat: o.lat,
+    lng: o.lng,
+  }));
+
+  return { places: mappedPlaces, origins: mappedOrigins, calculationMethod };
 }

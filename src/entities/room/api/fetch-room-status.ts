@@ -1,129 +1,156 @@
-
+import { apiClient } from "@/shared/api/axios-instance";
+import { saveSessionData } from "@/shared/lib/room-session";
 import type { RoomStatus, Member, Location } from "../model/types";
 
-// TODO: apiClient 교체
-// 멤버 목록 mock 저장소.
-// 모듈 레벨 Map은 탭/새로고침마다 초기화되어 다른 탭에서 참가한 멤버가
-// 주최자 화면에 반영되지 않았다. localStorage에 보관해 같은 브라우저의
-// 탭 간 동기화 + 새로고침 유지가 되도록 한다. (기기 간 동기화는 백엔드 필요)
-const membersKey = (code: string) => `members-${code}`;
-
-export function readMembers(code: string): Member[] | null {
-  const raw = localStorage.getItem(membersKey(code));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as Member[];
-  } catch {
-    return null;
-  }
+interface SupabaseMeeting {
+  meeting_id: number;
+  meeting_name: string;
+  meeting_datetime: string;
+  invite_link: string;
+  status: string;
+  created_at: string;
 }
 
-export function writeMembers(code: string, members: Member[]): void {
-  localStorage.setItem(membersKey(code), JSON.stringify(members));
+interface SupabaseParticipant {
+  participant_id: number;
+  participant_name: string;
+  role: string;
+  input_location_yn: boolean;
+  input_preference_yn: boolean;
+  place_vote_yn: boolean;
+  restaurant_vote_yn: boolean;
+}
+
+interface SupabaseLocation {
+  participant_id: number;
+  place_name: string | null;
+  address: string | null;
+  latitude: number;
+  longitude: number;
 }
 
 export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
-  // TODO: apiClient 교체
-  await new Promise((r) => setTimeout(r, 400));
-
-  // Load room data from localStorage
-  const storedRoomData = localStorage.getItem(`room-${code}`);
-  if (!storedRoomData) {
-    throw new Error("Room not found");
-  }
-  const roomData = JSON.parse(storedRoomData);
-
-  // 멤버 목록이 없으면 주최자만 담아 초기화한다.
-  let members = readMembers(code);
-  if (!members) {
-    const hostMember: Member = {
-      id: "host-" + Date.now(),
-      name: roomData.hostName,
-      isHost: true,
-      hasLocation: true,
-      hasPreference: true,
-      hasVoted: false,
-      locationLabel: undefined,
+  const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`);
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: "Room not found" }))) as {
+      error: string;
     };
-    members = [hostMember];
-    writeMembers(code, members);
+    throw new Error(err.error);
   }
+  const data = (await res.json()) as {
+    meeting: SupabaseMeeting;
+    participants: SupabaseParticipant[];
+    locations: SupabaseLocation[];
+  };
 
-  const locationInputCount = members.filter((m) => m.hasLocation).length;
-  const preferenceInputCount = members.filter((m) => m.hasPreference).length;
-  const totalCount = members.length;
+  const locationMap = new Map(
+    data.locations.map((l) => [l.participant_id, l]),
+  );
+
+  const creatorParticipantId =
+    typeof window !== "undefined"
+      ? localStorage.getItem(`moyeo_creator_${code}`)
+      : null;
+
+  const members: Member[] = data.participants.map((p) => {
+    const loc = locationMap.get(p.participant_id);
+    const location: Location | undefined = loc
+      ? {
+          label: loc.place_name ?? "",
+          roadAddress: loc.address ?? "",
+          lat: loc.latitude,
+          lng: loc.longitude,
+        }
+      : undefined;
+
+    const isCreator =
+      creatorParticipantId !== null &&
+      String(p.participant_id) === creatorParticipantId;
+
+    return {
+      id: String(p.participant_id),
+      name: p.participant_name,
+      role: isCreator ? "HOST" : "MEMBER",
+      isHost: isCreator,
+      hasLocation: p.input_location_yn,
+      hasPreference: p.input_preference_yn,
+      hasVoted: p.place_vote_yn,
+      location,
+    };
+  });
+
+  const host = members.find((m) => m.isHost);
+
+  const meetingLocation = (() => {
+    if (typeof window === "undefined") return undefined;
+    try {
+      const raw = localStorage.getItem(`room-${code}`);
+      if (!raw) return undefined;
+      return (JSON.parse(raw) as { meetingLocation?: Location }).meetingLocation;
+    } catch {
+      return undefined;
+    }
+  })();
 
   return {
     room: {
-      code: roomData.code,
-      name: roomData.name,
-      dateTime: roomData.dateTime,
-      hostName: roomData.hostName,
-      createdAt: roomData.createdAt,
-      meetingLocation: roomData.meetingLocation,
+      code,
+      meetingId: String(data.meeting.meeting_id),
+      name: data.meeting.meeting_name,
+      dateTime: data.meeting.meeting_datetime,
+      hostName: host?.name ?? "",
+      createdAt: data.meeting.created_at,
+      meetingLocation,
     },
     members,
-    totalCount,
-    locationInputCount,
-    preferenceInputCount,
+    totalCount: members.length,
+    locationInputCount: members.filter((m) => m.hasLocation).length,
+    preferenceInputCount: members.filter((m) => m.hasPreference).length,
   };
 }
 
 export async function joinRoom(params: {
   code: string;
   name: string;
-  password: string;
 }): Promise<{ memberId: string; member: Member }> {
-  // TODO: apiClient 교체
-  await new Promise((r) => setTimeout(r, 500));
+  const response = await apiClient.post<{
+    participantId: string;
+    accessToken: string;
+    meetingId: string;
+  }>("/functions/v1/join-meeting", {
+    inviteCode: params.code,
+    participantName: params.name,
+  });
 
-  // 방 존재 여부만 확인합니다.
-  const storedRoomData = localStorage.getItem(`room-${params.code}`);
-  if (!storedRoomData) {
-    throw new Error("Room not found");
-  }
+  const { participantId, accessToken, meetingId } = response.data;
+  saveSessionData(params.code, { participantId, accessToken, meetingId });
 
-  // ❌ [삭제된 부분] 방 공통 비밀번호와 비교하는 로직을 삭제했습니다.
-  // const roomData = JSON.parse(storedRoomData);
-  // if (roomData.password !== params.password) {
-  //   throw new Error("Invalid password");
-  // }
-
-  // ✅ 새 멤버 생성 (입력받은 params.password는 향후 백엔드 연동 시 암호화하여 DB에 저장)
-  const newMember: Member = {
-    id: "m-" + Date.now(),
+  const member: Member = {
+    id: participantId,
     name: params.name,
+    role: "MEMBER",
     isHost: false,
     hasLocation: false,
     hasPreference: false,
     hasVoted: false,
-    locationLabel: undefined,
   };
 
-  const members = readMembers(params.code) ?? [];
-  members.push(newMember);
-  writeMembers(params.code, members);
-
-  return {
-    memberId: newMember.id,
-    member: newMember,
-  };
+  return { memberId: participantId, member };
 }
 
 export async function deleteMember(params: {
   code: string;
   memberId: string;
 }): Promise<void> {
-  // TODO: apiClient 교체
-  await new Promise((r) => setTimeout(r, 300));
-
-  const members = readMembers(params.code);
-  if (members) {
-    const index = members.findIndex((m) => m.id === params.memberId);
-    if (index !== -1) {
-      members.splice(index, 1);
-      writeMembers(params.code, members);
-    }
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(params.code)}/participants/${params.memberId}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: "삭제 실패" }))) as {
+      error: string;
+    };
+    throw new Error(err.error);
   }
 }
 
@@ -132,18 +159,35 @@ export async function updateMemberLocation(params: {
   memberId: string;
   location: Location;
 }): Promise<Member> {
-  // TODO: apiClient 교체
-  await new Promise((r) => setTimeout(r, 350));
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(params.code)}/participants/location`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        participantId: params.memberId,
+        label: params.location.label,
+        roadAddress: params.location.roadAddress,
+        lat: params.location.lat,
+        lng: params.location.lng,
+      }),
+    },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: "위치 저장 실패" }))) as {
+      error: string;
+    };
+    throw new Error(err.error);
+  }
 
-  const members = readMembers(params.code);
-  if (!members) throw new Error("Room not found");
-  const target = members.find((m) => m.id === params.memberId);
-  if (!target) throw new Error("Member not found");
-
-  target.location = params.location;
-  target.locationLabel = params.location.label;
-  target.hasLocation = true;
-  writeMembers(params.code, members);
-
-  return target;
+  return {
+    id: params.memberId,
+    name: "",
+    role: "MEMBER",
+    isHost: false,
+    hasLocation: true,
+    hasPreference: false,
+    hasVoted: false,
+    location: params.location,
+  };
 }

@@ -6,6 +6,7 @@ export {
   updateMemberLocation,
 } from "./api/fetch-room-status";
 export { fetchMyRooms } from "./api/fetch-my-rooms";
+export { updateMemberPreference } from "./api/update-member-preference";
 export {
   addJoinedCode,
   getJoinedCodes,
@@ -20,4 +21,7 @@ export type {
   Member,
   RoomStatus,
   Location,
+  MemberPreference,
+  PreferenceTagInput,
+  RestrictionTagInput,
 } from "./model/types";

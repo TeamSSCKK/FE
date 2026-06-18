@@ -1,33 +1,43 @@
-/**
- * 방 세션 관리 유틸리티
- * 참가자 ID를 sessionStorage에 저장하고 불러오는 기능을 제공합니다.
- */
+export interface RoomSessionData {
+  participantId: string;
+  accessToken: string;
+  meetingId: string;
+}
 
-/**
- * 방 참가자 ID를 sessionStorage에 저장합니다.
- * @param roomCode 방 코드
- * @param memberId 참가자 ID
- */
+function sessionKey(roomCode: string) {
+  return `moyeo_session_${roomCode}`;
+}
+
+export function saveSessionData(roomCode: string, data: RoomSessionData): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(sessionKey(roomCode), JSON.stringify(data));
+}
+
+export function loadSessionData(roomCode: string): RoomSessionData | null {
+  if (typeof window === "undefined") return null;
+  const raw = sessionStorage.getItem(sessionKey(roomCode));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as RoomSessionData;
+  } catch {
+    return null;
+  }
+}
+
 export function saveMemberId(roomCode: string, memberId: string): void {
   if (typeof window === "undefined") return;
   sessionStorage.setItem("moyeo_member_" + roomCode, memberId);
 }
 
-/**
- * 방 참가자 ID를 sessionStorage에서 불러옵니다.
- * @param roomCode 방 코드
- * @returns 참가자 ID 또는 null
- */
 export function loadMemberId(roomCode: string): string | null {
   if (typeof window === "undefined") return null;
+  const session = loadSessionData(roomCode);
+  if (session) return session.participantId;
   return sessionStorage.getItem("moyeo_member_" + roomCode);
 }
 
-/**
- * 방 참가자 ID를 sessionStorage에서 제거합니다.
- * @param roomCode 방 코드
- */
 export function clearMemberId(roomCode: string): void {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem("moyeo_member_" + roomCode);
+  sessionStorage.removeItem(sessionKey(roomCode));
 }

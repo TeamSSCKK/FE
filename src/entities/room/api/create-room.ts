@@ -1,28 +1,36 @@
+import { apiClient } from "@/shared/api/axios-instance";
+import { saveSessionData } from "@/shared/lib/room-session";
 import type { CreateRoomInput, CreateRoomResult } from "../model/types";
-import { generateRoomCode } from "../lib/generate-code";
 
 export async function createRoom(
   input: CreateRoomInput,
 ): Promise<CreateRoomResult> {
-  await new Promise((r) => setTimeout(r, 500));
+  const meetingRes = await apiClient.post<{
+    meetingId: string;
+    inviteCode: string;
+    status: string;
+  }>("/functions/v1/create-meeting", {
+    meetingName: input.name,
+    meetingDatetime: input.dateTime,
+  });
+  const { meetingId, inviteCode } = meetingRes.data;
 
-  const code = generateRoomCode();
-  const createdAt = new Date().toISOString();
+  const joinRes = await apiClient.post<{
+    participantId: string;
+    accessToken: string;
+    meetingId: string;
+  }>("/functions/v1/join-meeting", {
+    inviteCode,
+    participantName: input.hostName,
+  });
+  const { participantId, accessToken } = joinRes.data;
 
-  // 실제 데이터를 localStorage에 저장
-  const roomData = {
-    code,
-    name: input.name,
-    dateTime: input.dateTime,
-    hostName: input.hostName,
-    password: input.password,
-    createdAt,
-  };
+  saveSessionData(inviteCode, { participantId, accessToken, meetingId });
 
-  localStorage.setItem(`room-${code}`, JSON.stringify(roomData));
+  // 이 기기가 모임 생성자임을 기록 (호스트 식별용)
+  if (typeof window !== "undefined") {
+    localStorage.setItem(`moyeo_creator_${inviteCode}`, participantId);
+  }
 
-  return {
-    code,
-    createdAt,
-  };
+  return { code: inviteCode, meetingId };
 }

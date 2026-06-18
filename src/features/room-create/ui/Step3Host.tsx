@@ -1,23 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/shared/ui/button";
 import { Label } from "@/shared/ui/label";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 import { useRoomCreateStore } from "../model/store";
-import { isValidHost, isValidPassword } from "../model/validation";
+import { isValidHost } from "../model/validation";
 import { ClearButton } from "@/shared/ui/clear-button";
 import { SoftInput } from "./SoftInput";
 import { StepShell } from "./StepShell";
 import { ValidationAlert } from "./ValidationAlert";
+import { useState } from "react";
 
 export function Step3Host() {
   const name = useRoomCreateStore((s) => s.name);
   const dateTime = useRoomCreateStore((s) => s.dateTime);
   const hostName = useRoomCreateStore((s) => s.hostName);
-  const password = useRoomCreateStore((s) => s.password);
   const setHostName = useRoomCreateStore((s) => s.setHostName);
-  const setPassword = useRoomCreateStore((s) => s.setPassword);
   const goToStep = useRoomCreateStore((s) => s.goToStep);
   const submit = useRoomCreateStore((s) => s.submit);
   const isSubmitting = useRoomCreateStore((s) => s.isSubmitting);
@@ -26,10 +24,6 @@ export function Step3Host() {
   const handleSubmit = () => {
     if (!isValidHost(hostName)) {
       setAlertMessage("주최자 이름을 1자 이상 20자 이하로 입력해주세요.");
-      return;
-    }
-    if (!isValidPassword(password)) {
-      setAlertMessage("비밀번호는 4자 이상 20자 이하로 입력해주세요.");
       return;
     }
     void submit();
@@ -72,27 +66,6 @@ export function Step3Host() {
               maxLength={20}
             />
             {hostName && <ClearButton onClick={() => setHostName("")} />}
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label
-            htmlFor="host-password"
-            className="text-sm text-muted-foreground"
-          >
-            비밀번호
-          </Label>
-          <div className="relative">
-            <SoftInput
-              id="host-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="4자 이상 입력하세요"
-              className="pr-11"
-              maxLength={20}
-            />
-            {password && <ClearButton onClick={() => setPassword("")} />}
           </div>
         </div>
       </StepShell>

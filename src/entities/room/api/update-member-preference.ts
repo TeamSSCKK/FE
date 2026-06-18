@@ -1,5 +1,4 @@
 import type { MemberPreference } from "../model/types";
-import { readMembers, writeMembers } from "./fetch-room-status";
 
 export interface UpdateMemberPreferenceInput {
   code: string;
@@ -10,15 +9,29 @@ export interface UpdateMemberPreferenceInput {
 export async function updateMemberPreference(
   input: UpdateMemberPreferenceInput,
 ): Promise<void> {
-  // TODO: apiClient 교체
-  await new Promise((r) => setTimeout(r, 200));
+  const rows = [
+    ...input.preference.tags.map((t) => ({
+      preference_type: t.tone === "like" ? "LIKE" : "DISLIKE",
+      preference_value: t.label,
+    })),
+    ...input.preference.restrictions.map((r) => ({
+      preference_type: "RESTRICTION",
+      preference_value: r.label,
+    })),
+  ];
 
-  const members = readMembers(input.code);
-  if (!members) throw new Error("Room not found");
-  const target = members.find((m) => m.id === input.memberId);
-  if (!target) throw new Error("Member not found");
-
-  target.preference = input.preference;
-  target.hasPreference = true;
-  writeMembers(input.code, members);
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(input.code)}/participants/preference`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participantId: input.memberId, rows }),
+    },
+  );
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: "취향 저장 실패" }))) as {
+      error: string;
+    };
+    throw new Error(err.error);
+  }
 }

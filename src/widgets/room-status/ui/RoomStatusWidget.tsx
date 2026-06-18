@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
-import { saveMemberId } from "@/shared/lib/room-session";
 import { cn } from "@/shared/lib/utils";
 import {
   fetchRoomStatus,
@@ -165,7 +164,7 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
   );
 
   const handleJoinSuccess = (memberId: string) => {
-    saveMemberId(roomCode, memberId);
+    // saveSessionData는 joinRoom API 내부에서 호출됨
     setLocalMemberId(memberId);
   };
 
@@ -205,7 +204,7 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
     return (
       <div className="min-h-screen bg-white p-5">
         <div className="animate-fade-up">
-          <RoomJoinForm roomCode={roomCode} onSuccess={handleJoinSuccess} />
+          <RoomJoinForm roomCode={roomCode} onSuccess={(id) => handleJoinSuccess(id)} />
         </div>
       </div>
     );

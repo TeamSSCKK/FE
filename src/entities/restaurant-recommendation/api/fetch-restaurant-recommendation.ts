@@ -1,57 +1,62 @@
-import type { RestaurantRecommendationResult } from "../model/types";
+import { apiClient } from "@/shared/api/axios-instance";
+import type {
+  RestaurantRecommendationResult,
+  RecommendedRestaurant,
+} from "../model/types";
+
+interface BackendRestaurant {
+  id: string;
+  name: string;
+  category?: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  distanceMeters?: number;
+  preferenceScore?: number;
+  rank?: number;
+  matchedLikes?: string[];
+  sourceUrl?: string;
+}
+
+interface BackendResult {
+  place?: { id: string; name: string; lat: number; lng: number };
+  restaurants: BackendRestaurant[];
+}
 
 export async function fetchRestaurantRecommendation(
   code: string,
 ): Promise<RestaurantRecommendationResult> {
-  void code;
-  await new Promise((r) => setTimeout(r, 2500));
-  return {
-    restaurants: [
-      {
-        id: "r1",
-        name: "김밥천국 용산점",
-        travelTimeMinutes: 20,
-        fitScore: 97,
-        naverMapUrl: "https://map.naver.com/",
-        kakaoMapUrl: "https://map.kakao.com/",
-        tags: ["단체", "분위기 맛집"],
-        representativeMenu: ["김밥", "라면", "떡볶이"],
-        photos: [
-          { id: "p1", url: "" },
-          { id: "p2", url: "" },
-          { id: "p3", url: "" },
-        ],
-      },
-      {
-        id: "r2",
-        name: "동작 돈까스",
-        travelTimeMinutes: 15,
-        fitScore: 91,
-        naverMapUrl: "https://map.naver.com/",
-        kakaoMapUrl: "https://map.kakao.com/",
-        tags: ["가성비"],
-        representativeMenu: ["등심까스", "치즈까스"],
-        photos: [
-          { id: "p1", url: "" },
-          { id: "p2", url: "" },
-          { id: "p3", url: "" },
-        ],
-      },
-      {
-        id: "r3",
-        name: "흑석 라멘집",
-        travelTimeMinutes: 25,
-        fitScore: 88,
-        naverMapUrl: "https://map.naver.com/",
-        kakaoMapUrl: "https://map.kakao.com/",
-        tags: ["분위기 맛집"],
-        representativeMenu: ["차슈라멘"],
-        photos: [
-          { id: "p1", url: "" },
-          { id: "p2", url: "" },
-          { id: "p3", url: "" },
-        ],
-      },
-    ],
-  };
+  const placeCandidateId =
+    typeof window !== "undefined"
+      ? (localStorage.getItem(`moyeo_place_${code}`) ?? "")
+      : "";
+
+  const response = await apiClient.post<BackendResult>(
+    "/functions/v1/recommend-restaurants",
+    {
+      inviteCode: code,
+      placeCandidateId: placeCandidateId ? Number(placeCandidateId) : undefined,
+      limit: 5,
+    },
+  );
+
+  const { place, restaurants } = response.data;
+
+  const mapped: RecommendedRestaurant[] = restaurants.map((r) => ({
+    id: r.id,
+    name: r.name,
+    travelTimeMinutes: r.distanceMeters ? Math.round(r.distanceMeters / 78) : 0,
+    fitScore: r.preferenceScore != null ? Math.round(r.preferenceScore * 100) : 0,
+    naverMapUrl: r.sourceUrl ?? "",
+    kakaoMapUrl: "",
+    tags: r.matchedLikes ?? [],
+    representativeMenu: [],
+    photos: [],
+    address: r.address,
+    lat: r.lat,
+    lng: r.lng,
+    rank: r.rank,
+  }));
+
+  return { place, restaurants: mapped };
 }
