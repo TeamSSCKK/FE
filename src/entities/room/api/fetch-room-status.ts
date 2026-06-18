@@ -1,3 +1,4 @@
+import axios from "axios";
 import { apiClient } from "@/shared/api/axios-instance";
 import { saveSessionData } from "@/shared/lib/room-session";
 import type { RoomStatus, Member, Location } from "../model/types";
@@ -30,7 +31,9 @@ interface SupabaseLocation {
 }
 
 export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
-  const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`);
+  const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Room not found" }))) as {
       error: string;
@@ -113,14 +116,35 @@ export async function joinRoom(params: {
   code: string;
   name: string;
 }): Promise<{ memberId: string; member: Member }> {
-  const response = await apiClient.post<{
-    participantId: number | string;
-    accessToken: string;
-    meetingId: number | string;
-  }>("/functions/v1/join-meeting", {
-    inviteCode: params.code,
-    participantName: params.name,
-  });
+  let response;
+  try {
+    response = await apiClient.post<{
+      participantId: number | string;
+      accessToken: string;
+      meetingId: number | string;
+    }>("/functions/v1/join-meeting", {
+      inviteCode: params.code,
+      participantName: params.name,
+    });
+  } catch (e) {
+    // 백엔드는 (meeting_id, participant_name) unique 위반을 500으로 던진다.
+    // join 단계에서 가장 흔한 실패가 동명이인이므로 안내 메시지로 변환한다.
+    if (axios.isAxiosError(e)) {
+      const status = e.response?.status;
+      if (status === 500) {
+        throw new Error(
+          "이미 같은 이름의 참가자가 있어요. 다른 이름으로 참가해주세요.",
+        );
+      }
+      if (status === 409) {
+        throw new Error("지금은 참여할 수 없는 모임이에요.");
+      }
+      if (status === 404) {
+        throw new Error("모임을 찾을 수 없어요. 링크를 다시 확인해주세요.");
+      }
+    }
+    throw new Error("참여에 실패했어요. 잠시 후 다시 시도해주세요.");
+  }
 
   // 백엔드는 id를 숫자로 내려주므로 즉시 문자열로 정규화한다.
   const participantId = String(response.data.participantId);
