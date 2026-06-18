@@ -114,15 +114,18 @@ export async function joinRoom(params: {
   name: string;
 }): Promise<{ memberId: string; member: Member }> {
   const response = await apiClient.post<{
-    participantId: string;
+    participantId: number | string;
     accessToken: string;
-    meetingId: string;
+    meetingId: number | string;
   }>("/functions/v1/join-meeting", {
     inviteCode: params.code,
     participantName: params.name,
   });
 
-  const { participantId, accessToken, meetingId } = response.data;
+  // 백엔드는 id를 숫자로 내려주므로 즉시 문자열로 정규화한다.
+  const participantId = String(response.data.participantId);
+  const meetingId = String(response.data.meetingId);
+  const { accessToken } = response.data;
   saveSessionData(params.code, { participantId, accessToken, meetingId });
 
   const member: Member = {

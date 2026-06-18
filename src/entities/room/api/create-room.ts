@@ -6,24 +6,27 @@ export async function createRoom(
   input: CreateRoomInput,
 ): Promise<CreateRoomResult> {
   const meetingRes = await apiClient.post<{
-    meetingId: string;
+    meetingId: number | string;
     inviteCode: string;
     status: string;
   }>("/functions/v1/create-meeting", {
     meetingName: input.name,
     meetingDatetime: input.dateTime,
   });
-  const { meetingId, inviteCode } = meetingRes.data;
+  // 백엔드는 id를 숫자로 내려주므로 즉시 문자열로 정규화한다.
+  const meetingId = String(meetingRes.data.meetingId);
+  const { inviteCode } = meetingRes.data;
 
   const joinRes = await apiClient.post<{
-    participantId: string;
+    participantId: number | string;
     accessToken: string;
-    meetingId: string;
+    meetingId: number | string;
   }>("/functions/v1/join-meeting", {
     inviteCode,
     participantName: input.hostName,
   });
-  const { participantId, accessToken } = joinRes.data;
+  const participantId = String(joinRes.data.participantId);
+  const { accessToken } = joinRes.data;
 
   saveSessionData(inviteCode, { participantId, accessToken, meetingId });
 
