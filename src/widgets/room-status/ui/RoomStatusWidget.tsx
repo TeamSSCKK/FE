@@ -255,14 +255,14 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
                 onClick={() => router.push(`/rooms/${roomCode}/location`)}
                 className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
-                위치 입력하기
+                {currentMember?.hasLocation ? "위치 수정하기" : "위치 입력하기"}
               </Button>
               <Button
-                onClick={handleNotReady}
+                onClick={() => router.push(`/rooms/${roomCode}/preference`)}
                 variant="secondary"
                 className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
-                취향 입력하기
+                {currentMember?.hasPreference ? "취향 수정하기" : "취향 입력하기"}
               </Button>
               <Button
                 onClick={handleNotReady}
@@ -278,14 +278,14 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
                 onClick={() => router.push(`/rooms/${roomCode}/location`)}
                 className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
-                위치 수정하기
+                {currentMember?.hasLocation ? "위치 수정하기" : "위치 입력하기"}
               </Button>
               <Button
-                onClick={handleNotReady}
+                onClick={() => router.push(`/rooms/${roomCode}/preference`)}
                 variant="secondary"
                 className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
               >
-                취향 수정하기
+                {currentMember?.hasPreference ? "취향 수정하기" : "취향 입력하기"}
               </Button>
               <Button
                 onClick={handleNotReady}

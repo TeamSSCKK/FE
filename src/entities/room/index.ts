@@ -11,6 +11,7 @@ export {
   getJoinedCodes,
   removeJoinedCode,
 } from "./lib/joined-rooms-storage";
+export { useHostGuard } from "./lib/use-host-guard";
 export type {
   Room,
   RoomCode,

@@ -60,6 +60,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       dateTime: roomData.dateTime,
       hostName: roomData.hostName,
       createdAt: roomData.createdAt,
+      meetingLocation: roomData.meetingLocation,
     },
     members,
     totalCount,

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Map } from "lucide-react";
-import { fetchRoomStatus, type Room } from "@/entities/room";
+import { useHostGuard } from "@/entities/room";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
 
 interface Props {
@@ -37,33 +37,33 @@ function CurationCard({ caption, title, delay, onClick }: CurationCardProps) {
 
 export function RoomCurationView({ roomCode }: Props) {
   const router = useRouter();
-  const [room, setRoom] = useState<Room | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let canceled = false;
-    async function load() {
-      try {
-        const status = await fetchRoomStatus(roomCode);
-        if (!canceled) setRoom(status.room);
-      } catch (e) {
-        console.error("fetchRoomStatus error", e);
-      } finally {
-        if (!canceled) setIsLoading(false);
-      }
-    }
-    void load();
-    return () => {
-      canceled = true;
-    };
-  }, [roomCode]);
+  const { status, isReady, error } = useHostGuard(roomCode);
+  const room = status?.room ?? null;
 
   // 추천 결과 화면은 아직 준비 중 — 공통 안내만 처리
   const handleNotReady = useCallback(() => {
     alert("해당 기능은 준비 중입니다!");
   }, []);
 
-  if (isLoading) {
+  // 모임 식당 추천 — 모임 장소가 이미 정해져 있으면 추천 화면으로,
+  // 아니면 장소 입력 단계부터 보낸다.
+  const handleRestaurantClick = useCallback(() => {
+    router.push(
+      room?.meetingLocation
+        ? `/rooms/${roomCode}/curation/restaurant`
+        : `/rooms/${roomCode}/curation/restaurant-location`,
+    );
+  }, [roomCode, router, room?.meetingLocation]);
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-6 text-center">
+        <p className="text-sm text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
@@ -118,7 +118,7 @@ export function RoomCurationView({ roomCode }: Props) {
             caption="저희는 이미 장소를 정했어요."
             title="모임 식당 추천"
             delay={240}
-            onClick={handleNotReady}
+            onClick={handleRestaurantClick}
           />
         </div>
       </div>
