@@ -1,3 +1,4 @@
+import axios from "axios";
 import { apiClient } from "@/shared/api/axios-instance";
 import type {
   PlaceRecommendationResult,
@@ -34,17 +35,8 @@ interface RecommendPlacesResponse {
   origins: BackendOrigin[];
 }
 
-export async function fetchPlaceRecommendation(
-  code: string,
-): Promise<PlaceRecommendationResult> {
-  const response = await apiClient.post<RecommendPlacesResponse>(
-    "/functions/v1/recommend-places",
-    { inviteCode: code },
-  );
-
-  const { calculationMethod, places, origins } = response.data;
-
-  const mappedPlaces: RecommendedPlace[] = places.map((p) => ({
+function mapToResult(data: RecommendPlacesResponse): PlaceRecommendationResult {
+  const mappedPlaces: RecommendedPlace[] = data.places.map((p) => ({
     id: p.id,
     name: p.name,
     category: p.category ?? "",
@@ -59,12 +51,43 @@ export async function fetchPlaceRecommendation(
     rank: p.rank,
   }));
 
-  const mappedOrigins: MemberOrigin[] = origins.map((o) => ({
+  const mappedOrigins: MemberOrigin[] = data.origins.map((o) => ({
     memberId: o.memberId,
     memberName: o.memberName,
     lat: o.lat,
     lng: o.lng,
   }));
 
-  return { places: mappedPlaces, origins: mappedOrigins, calculationMethod };
+  return {
+    places: mappedPlaces,
+    origins: mappedOrigins,
+    calculationMethod: data.calculationMethod,
+  };
+}
+
+export async function fetchPlaceRecommendation(
+  code: string,
+): Promise<PlaceRecommendationResult> {
+  try {
+    const response = await apiClient.post<RecommendPlacesResponse>(
+      "/functions/v1/recommend-places",
+      { inviteCode: code },
+    );
+    return mapToResult(response.data);
+  } catch (e) {
+    // 추천을 한 번 받으면 모임 상태가 PLACE_VOTING으로 바뀌어, 재진입 시
+    // recommend-places가 409를 반환한다. 이미 저장된 추천 결과(place_candidate)를
+    // 조회해 그대로 보여준다. (위치 미입력 등 결과가 없는 409는 그대로 throw)
+    if (axios.isAxiosError(e) && e.response?.status === 409) {
+      const res = await fetch(
+        `/api/rooms/${encodeURIComponent(code)}/candidates`,
+        { cache: "no-store" },
+      );
+      if (res.ok) {
+        const data = (await res.json()) as RecommendPlacesResponse;
+        if (data.places?.length) return mapToResult(data);
+      }
+    }
+    throw e;
+  }
 }
