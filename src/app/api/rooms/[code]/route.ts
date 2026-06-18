@@ -55,5 +55,28 @@ export async function GET(
     if (locRes.ok) locations = (await locRes.json()) as unknown[];
   }
 
-  return NextResponse.json({ meeting, participants, locations });
+  // 최종 확정 식당: final_decision → restaurant_candidate 조인 조회
+  let finalRestaurant: unknown = null;
+  const decisionRes = await fetch(
+    `${supabaseUrl}/rest/v1/final_decision?meeting_id=eq.${meeting.meeting_id}&select=final_restaurant_candidate_id`,
+    { headers: supabaseHeaders(), cache: "no-store" },
+  );
+  if (decisionRes.ok) {
+    const decisions = (await decisionRes.json()) as {
+      final_restaurant_candidate_id: number | null;
+    }[];
+    const restaurantId = decisions[0]?.final_restaurant_candidate_id;
+    if (restaurantId) {
+      const restRes = await fetch(
+        `${supabaseUrl}/rest/v1/restaurant_candidate?restaurant_candidate_id=eq.${restaurantId}&select=restaurant_candidate_id,restaurant_name,category,address,preference_score,distance_meters`,
+        { headers: supabaseHeaders(), cache: "no-store" },
+      );
+      if (restRes.ok) {
+        const rows = (await restRes.json()) as unknown[];
+        finalRestaurant = rows[0] ?? null;
+      }
+    }
+  }
+
+  return NextResponse.json({ meeting, participants, locations, finalRestaurant });
 }

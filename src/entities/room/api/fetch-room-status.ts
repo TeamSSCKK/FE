@@ -1,7 +1,12 @@
 import axios from "axios";
 import { apiClient } from "@/shared/api/axios-instance";
 import { saveSessionData } from "@/shared/lib/room-session";
-import type { RoomStatus, Member, Location } from "../model/types";
+import type {
+  RoomStatus,
+  Member,
+  Location,
+  SelectedRestaurant,
+} from "../model/types";
 
 interface SupabaseMeeting {
   meeting_id: number;
@@ -30,6 +35,15 @@ interface SupabaseLocation {
   longitude: number;
 }
 
+interface SupabaseFinalRestaurant {
+  restaurant_candidate_id: number;
+  restaurant_name: string;
+  category: string | null;
+  address: string | null;
+  preference_score: number | null;
+  distance_meters: number | null;
+}
+
 export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
   const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`, {
     cache: "no-store",
@@ -44,6 +58,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
     meeting: SupabaseMeeting;
     participants: SupabaseParticipant[];
     locations: SupabaseLocation[];
+    finalRestaurant: SupabaseFinalRestaurant | null;
   };
 
   const locationMap = new Map(
@@ -95,6 +110,25 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
     }
   })();
 
+  // 백엔드 final_decision 기반 확정 식당 매핑 (도보 분속 ~78m/분 근사)
+  const fr = data.finalRestaurant;
+  const selectedRestaurant: SelectedRestaurant | undefined = fr
+    ? {
+        id: String(fr.restaurant_candidate_id),
+        name: fr.restaurant_name,
+        category: fr.category ?? undefined,
+        address: fr.address ?? undefined,
+        fitScore:
+          fr.preference_score != null
+            ? Math.min(100, Math.max(0, Math.round(fr.preference_score)))
+            : undefined,
+        travelTimeMinutes:
+          fr.distance_meters != null
+            ? Math.round(fr.distance_meters / 78)
+            : undefined,
+      }
+    : undefined;
+
   return {
     room: {
       code,
@@ -104,6 +138,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       hostName: host?.name ?? "",
       createdAt: data.meeting.created_at,
       meetingLocation,
+      selectedRestaurant,
     },
     members,
     totalCount: members.length,

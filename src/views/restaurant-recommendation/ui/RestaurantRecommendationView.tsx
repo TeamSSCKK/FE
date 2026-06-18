@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { useHostGuard } from "@/entities/room";
+import { closeVote } from "@/features/vote-action";
 import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
 import type {
   ConfirmedPlace,
@@ -20,12 +21,13 @@ type Phase = "loading" | "success" | "error";
 
 export function RestaurantRecommendationView({ code }: Props) {
   const router = useRouter();
-  const { isReady: isHostReady, error: guardError } = useHostGuard(code);
+  const { status, isReady: isHostReady, error: guardError } = useHostGuard(code);
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restaurants, setRestaurants] = useState<RecommendedRestaurant[]>([]);
   const [confirmedPlace, setConfirmedPlace] = useState<ConfirmedPlace | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // 가드 통과 후에만 추천 fetch 실행. 멤버/게스트는 훅이 이미 리다이렉트한 상태.
   useEffect(() => {
@@ -113,9 +115,27 @@ export function RestaurantRecommendationView({ code }: Props) {
     setActiveIndex((i) => (i + 1) % totalCount);
   };
 
-  const handleSelect = () => {
-    alert(`"${current.name}"(을)를 모임 식당으로 선택했어요.`);
-    router.push(`/rooms/${code}`);
+  const handleSelect = async () => {
+    if (isConfirming) return;
+    const meetingId = status?.room.meetingId;
+    if (!meetingId) {
+      alert("모임 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    setIsConfirming(true);
+    try {
+      // 백엔드 final_decision에 확정 식당 저장 (close-vote, RESTAURANT)
+      await closeVote({
+        meetingId,
+        finalCandidateId: current.id,
+        voteType: "RESTAURANT",
+      });
+      router.push(`/rooms/${code}`);
+    } catch (e) {
+      console.error("closeVote(RESTAURANT) error", e);
+      alert("식당 확정에 실패했어요. 잠시 후 다시 시도해주세요.");
+      setIsConfirming(false);
+    }
   };
 
   if (phase === "loading") {
@@ -261,9 +281,10 @@ export function RestaurantRecommendationView({ code }: Props) {
         <button
           type="button"
           onClick={handleSelect}
-          className="w-full rounded-full bg-purple-600 py-4 text-sm font-semibold text-white hover:bg-purple-700 active:scale-[0.98]"
+          disabled={isConfirming}
+          className="w-full rounded-full bg-purple-600 py-4 text-sm font-semibold text-white hover:bg-purple-700 active:scale-[0.98] disabled:opacity-60"
         >
-          이 식당 선택하기
+          {isConfirming ? "확정 중..." : "이 식당 선택하기"}
         </button>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
+  Utensils,
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { formatKoreanDateTime } from "@/shared/lib/format-datetime";
@@ -381,6 +382,41 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
                 </>
               )}
             </div>
+          </div>
+        )}
+
+        {/* 확정된 모임 식당 — 식당 추천 후에만 표출 */}
+        {roomStatus.room.selectedRestaurant && (
+          <div className="animate-fade-up rounded-2xl border border-primary/20 bg-primary/[0.05] p-4">
+            <div className="flex items-center gap-1.5">
+              <Utensils className="h-4 w-4 text-primary" />
+              <p className="text-[12px] font-semibold text-primary">
+                확정된 모임 식당
+              </p>
+            </div>
+            <p className="mt-2 text-[17px] font-bold text-gray-900">
+              {roomStatus.room.selectedRestaurant.name}
+            </p>
+            {roomStatus.room.selectedRestaurant.category && (
+              <p className="text-[12px] text-muted-foreground">
+                {roomStatus.room.selectedRestaurant.category}
+              </p>
+            )}
+            <div className="mt-2 flex items-center gap-3 text-[12px] text-gray-700">
+              {roomStatus.room.selectedRestaurant.fitScore != null && (
+                <span>★ 적합도 {roomStatus.room.selectedRestaurant.fitScore}%</span>
+              )}
+              {roomStatus.room.selectedRestaurant.travelTimeMinutes != null && (
+                <span className="text-muted-foreground">
+                  도보 {roomStatus.room.selectedRestaurant.travelTimeMinutes}분
+                </span>
+              )}
+            </div>
+            {roomStatus.room.selectedRestaurant.address && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {roomStatus.room.selectedRestaurant.address}
+              </p>
+            )}
           </div>
         )}
       </div>

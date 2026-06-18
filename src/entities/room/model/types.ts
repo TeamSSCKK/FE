@@ -20,6 +20,20 @@ export interface Room {
   createdAt: string;
   /** 호스트가 큐레이션 단계에서 정한 모임 장소 (미설정 시 undefined) */
   meetingLocation?: Location;
+  /** 최종 확정된 모임 식당 (final_decision 기반, 미확정 시 undefined) */
+  selectedRestaurant?: SelectedRestaurant;
+}
+
+/** 모임 메인 화면 하단에 표출할 확정 식당 정보 */
+export interface SelectedRestaurant {
+  id: string;
+  name: string;
+  category?: string;
+  address?: string;
+  /** 적합도 (0~100) */
+  fitScore?: number;
+  /** 모임 장소로부터의 도보 환산 시간(분) */
+  travelTimeMinutes?: number;
 }
 
 export interface Location {
