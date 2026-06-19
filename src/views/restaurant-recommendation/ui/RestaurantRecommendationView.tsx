@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-import { useHostGuard } from "@/entities/room";
-import { closeVote } from "@/features/vote-action";
+import { useRoomRole } from "@/entities/room";
+import { useVoteActionStore } from "@/features/vote-action";
+import { fetchVoteResults, type VoteResults } from "@/entities/vote";
+import { VoteResultsPanel } from "@/widgets/vote-results";
 import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
 import type {
   ConfirmedPlace,
   RecommendedRestaurant,
 } from "@/entities/restaurant-recommendation/model/types";
 import { NaverMap, type MapMarker } from "@/widgets/naver-map";
+import { loadSessionData } from "@/shared/lib/room-session";
 import { cn } from "@/shared/lib/utils";
 
 interface Props {
@@ -21,17 +24,41 @@ type Phase = "loading" | "success" | "error";
 
 export function RestaurantRecommendationView({ code }: Props) {
   const router = useRouter();
-  const { status, isReady: isHostReady, error: guardError } = useHostGuard(code);
+  const role = useRoomRole(code);
   const [phase, setPhase] = useState<Phase>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [restaurants, setRestaurants] = useState<RecommendedRestaurant[]>([]);
   const [confirmedPlace, setConfirmedPlace] = useState<ConfirmedPlace | null>(null);
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [meetingId, setMeetingId] = useState<string | null>(null);
 
-  // 가드 통과 후에만 추천 fetch 실행. 멤버/게스트는 훅이 이미 리다이렉트한 상태.
+  // 투표 스토어 (RESTAURANT)
+  const initVote = useVoteActionStore((s) => s.init);
+  const selectVote = useVoteActionStore((s) => s.select);
+  const submitVote = useVoteActionStore((s) => s.submit);
+  const submittedCandidateId = useVoteActionStore((s) => s.submittedCandidateId);
+  const isSubmitting = useVoteActionStore((s) => s.isSubmitting);
+
+  const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
+  const [pollFinalized, setPollFinalized] = useState(false);
+
   useEffect(() => {
-    if (!isHostReady) return;
+    initVote("RESTAURANT");
+  }, [initVote]);
+
+  // meetingId: 세션 우선, 없으면 방 상태에서 폴백(세션 유실된 재흡수 호스트 대비)
+  useEffect(() => {
+    const fromSession = loadSessionData(code)?.meetingId ?? null;
+    if (fromSession) {
+      setMeetingId(fromSession);
+    } else if (role.roomStatus?.room.meetingId) {
+      setMeetingId(role.roomStatus.room.meetingId);
+    }
+  }, [code, role.roomStatus]);
+
+  // 역할 해소(로딩 종료) 후에만 추천 fetch — 조기 발화 방지.
+  useEffect(() => {
+    if (role.isLoading) return;
     let canceled = false;
 
     (async () => {
@@ -57,21 +84,62 @@ export function RestaurantRecommendationView({ code }: Props) {
     return () => {
       canceled = true;
     };
-  }, [code, isHostReady]);
+  }, [code, role.isLoading]);
 
-  // 가드 단계에서 네트워크 실패가 발생한 경우 에러 화면으로 전이
   useEffect(() => {
-    if (guardError) {
-      setErrorMessage(guardError);
+    if (role.error) {
+      setErrorMessage(role.error);
       setPhase("error");
     }
-  }, [guardError]);
+  }, [role.error]);
+
+  // 투표 현황 폴링 (확정 시 중단)
+  const refreshResults = useCallback(async () => {
+    try {
+      const r = await fetchVoteResults({ inviteCode: code, voteType: "RESTAURANT" });
+      setVoteResults(r);
+      setPollFinalized(r.finalized);
+    } catch (e) {
+      console.error("fetchVoteResults error", e);
+    }
+  }, [code]);
+
+  useEffect(() => {
+    if (phase !== "success") return;
+    let canceled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        await refreshResults();
+        if (!canceled && !pollFinalized) schedule();
+      }, 3000);
+    };
+    void refreshResults().then(() => {
+      if (!canceled) schedule();
+    });
+    return () => {
+      canceled = true;
+      clearTimeout(timer);
+    };
+  }, [phase, refreshResults, pollFinalized]);
 
   const totalCount = restaurants.length;
-  const current = useMemo(
-    () => restaurants[activeIndex],
-    [restaurants, activeIndex],
+  const current = useMemo(() => restaurants[activeIndex], [restaurants, activeIndex]);
+
+  const candidateName = useCallback(
+    (id: string) => restaurants.find((r) => r.id === id)?.name ?? id,
+    [restaurants],
   );
+
+  const handleVote = useCallback(() => {
+    if (!current) return;
+    selectVote(current.id);
+    void submitVote(code).then(() => void refreshResults());
+  }, [current, selectVote, submitVote, code, refreshResults]);
+
+  const handleResolved = useCallback(() => {
+    router.push(`/rooms/${code}`);
+  }, [router, code]);
 
   const markers = useMemo<MapMarker[]>(() => {
     const list: MapMarker[] = [];
@@ -107,36 +175,8 @@ export function RestaurantRecommendationView({ code }: Props) {
     return null;
   }, [current, confirmedPlace]);
 
-  const handlePrev = () => {
-    setActiveIndex((i) => (i - 1 + totalCount) % totalCount);
-  };
-
-  const handleNext = () => {
-    setActiveIndex((i) => (i + 1) % totalCount);
-  };
-
-  const handleSelect = async () => {
-    if (isConfirming) return;
-    const meetingId = status?.room.meetingId;
-    if (!meetingId) {
-      alert("모임 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-    setIsConfirming(true);
-    try {
-      // 백엔드 final_decision에 확정 식당 저장 (close-vote, RESTAURANT)
-      await closeVote({
-        meetingId,
-        finalCandidateId: current.id,
-        voteType: "RESTAURANT",
-      });
-      router.push(`/rooms/${code}`);
-    } catch (e) {
-      console.error("closeVote(RESTAURANT) error", e);
-      alert("식당 확정에 실패했어요. 잠시 후 다시 시도해주세요.");
-      setIsConfirming(false);
-    }
-  };
+  const handlePrev = () => setActiveIndex((i) => (i - 1 + totalCount) % totalCount);
+  const handleNext = () => setActiveIndex((i) => (i + 1) % totalCount);
 
   if (phase === "loading") {
     return (
@@ -203,20 +243,16 @@ export function RestaurantRecommendationView({ code }: Props) {
 
       <div className="px-5 pt-5">
         <h1 className="text-[22px] font-bold tracking-tight text-gray-900">
-          추천 식당을 확인해보세요
+          마음에 드는 식당에 투표하세요
         </h1>
         <p className="mt-1 text-[13px] text-muted-foreground">
           {activeIndex + 1} / {totalCount} · 좌우 화살표로 후보를 비교하세요.
         </p>
       </div>
 
-      <div className="mx-5 mt-4 h-[40vh] flex-shrink-0 overflow-hidden rounded-2xl bg-neutral-100">
+      <div className="mx-5 mt-4 h-[36vh] flex-shrink-0 overflow-hidden rounded-2xl bg-neutral-100">
         {mapCenter ? (
-          <NaverMap
-            center={mapCenter}
-            markers={markers}
-            showCenterPin={false}
-          />
+          <NaverMap center={mapCenter} markers={markers} showCenterPin={false} />
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -253,9 +289,7 @@ export function RestaurantRecommendationView({ code }: Props) {
           <p className="text-[11px] text-purple-600">
             {current.tags?.join(" · ") || "추천"}
           </p>
-          <p className="mt-1 text-base font-bold text-gray-900">
-            {current.name}
-          </p>
+          <p className="mt-1 text-base font-bold text-gray-900">{current.name}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             대표 메뉴 · {current.representativeMenu?.join(", ") || "-"}
           </p>
@@ -277,15 +311,44 @@ export function RestaurantRecommendationView({ code }: Props) {
         </button>
       </div>
 
-      <div className="mt-auto px-5 pb-6 pt-6">
+      {/* 현재 식당에 투표 */}
+      <div className="px-5 pt-4">
         <button
           type="button"
-          onClick={handleSelect}
-          disabled={isConfirming}
-          className="w-full rounded-full bg-purple-600 py-4 text-sm font-semibold text-white hover:bg-purple-700 active:scale-[0.98] disabled:opacity-60"
+          onClick={handleVote}
+          disabled={isSubmitting || (voteResults?.finalized ?? false)}
+          className={cn(
+            "w-full rounded-full py-4 text-sm font-semibold active:scale-[0.98] disabled:opacity-60",
+            submittedCandidateId === current.id
+              ? "bg-purple-100 text-purple-700"
+              : "bg-purple-600 text-white hover:bg-purple-700",
+          )}
         >
-          {isConfirming ? "확정 중..." : "이 식당 선택하기"}
+          {submittedCandidateId === current.id
+            ? "투표함 · 변경하려면 다른 식당 투표"
+            : "이 식당에 투표"}
         </button>
+      </div>
+
+      {/* 투표 현황 + 동률 중재 */}
+      <div className="px-5 pb-6 pt-3">
+        <VoteResultsPanel
+          voteType="RESTAURANT"
+          results={voteResults}
+          isHost={role.isHost}
+          meetingId={meetingId}
+          candidateName={candidateName}
+          onResolved={handleResolved}
+        />
+        {(voteResults?.finalized ?? false) && !role.isHost && (
+          <button
+            type="button"
+            onClick={() => router.push(`/rooms/${code}`)}
+            className="mt-3 w-full rounded-full bg-purple-600 py-4 text-sm font-semibold text-white hover:bg-purple-700"
+          >
+            모임 현황으로 가기
+          </button>
+        )}
       </div>
     </div>
   );

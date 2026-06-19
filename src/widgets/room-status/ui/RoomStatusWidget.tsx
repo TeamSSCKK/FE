@@ -68,10 +68,12 @@ function MemberRow({
         </div>
       </div>
 
+      {/* 위치 · 취향 · 장소투표 · 식당투표 */}
       <div className="flex items-center gap-1.5">
         <CheckCell filled={member.hasLocation} />
         <CheckCell filled={member.hasPreference} />
         <CheckCell filled={member.hasVoted} />
+        <CheckCell filled={member.hasRestaurantVoted ?? false} />
       </div>
 
       {showDelete && !member.isHost && (
@@ -297,6 +299,35 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
             </div>
           )}
         </div>
+
+        {/* 투표 진행 중 — 모든 참가자(호스트·멤버) 진입점 */}
+        {(roomStatus.room.status === "PLACE_VOTING" ||
+          roomStatus.room.status === "RESTAURANT_VOTING") && (
+          <div className="animate-fade-up rounded-2xl border border-primary/20 bg-primary/[0.06] p-4">
+            <p className="text-sm font-semibold text-gray-900">
+              {roomStatus.room.status === "PLACE_VOTING"
+                ? "장소 투표가 진행 중이에요"
+                : "식당 투표가 진행 중이에요"}
+            </p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              마음에 드는 후보에 투표하고 결과를 확인하세요.
+            </p>
+            <Button
+              onClick={() =>
+                router.push(
+                  roomStatus.room.status === "PLACE_VOTING"
+                    ? `/rooms/${roomCode}/vote/place`
+                    : `/rooms/${roomCode}/vote/restaurant`,
+                )
+              }
+              className="mt-3 h-11 w-full rounded-2xl text-sm font-semibold active:scale-[0.97]"
+            >
+              {roomStatus.room.status === "PLACE_VOTING"
+                ? "장소 투표하기"
+                : "식당 투표하기"}
+            </Button>
+          </div>
+        )}
 
         {/* 진행률 */}
         <div className="animate-fade-up rounded-2xl bg-primary/[0.04] p-4">

@@ -93,6 +93,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       hasLocation: p.input_location_yn,
       hasPreference: p.input_preference_yn,
       hasVoted: p.place_vote_yn,
+      hasRestaurantVoted: p.restaurant_vote_yn,
       location,
     };
   });
@@ -137,6 +138,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       dateTime: data.meeting.meeting_datetime,
       hostName: host?.name ?? "",
       createdAt: data.meeting.created_at,
+      status: data.meeting.status,
       meetingLocation,
       selectedRestaurant,
     },

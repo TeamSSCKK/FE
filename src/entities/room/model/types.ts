@@ -18,6 +18,8 @@ export interface Room {
   dateTime: string;
   hostName: string;
   createdAt: string;
+  /** meeting.status (예: RECRUITING, PLACE_VOTING, RESTAURANT_VOTING, CLOSED) */
+  status?: string;
   /** 호스트가 큐레이션 단계에서 정한 모임 장소 (미설정 시 undefined) */
   meetingLocation?: Location;
   /** 최종 확정된 모임 식당 (final_decision 기반, 미확정 시 undefined) */
@@ -69,7 +71,10 @@ export interface Member {
   isHost: boolean;
   hasLocation: boolean;
   hasPreference: boolean;
+  /** 장소 투표 완료 여부 (place_vote_yn) */
   hasVoted: boolean;
+  /** 식당 투표 완료 여부 (restaurant_vote_yn) */
+  hasRestaurantVoted?: boolean;
   /** @deprecated `location.label` 사용 */
   locationLabel?: string;
   location?: Location;
