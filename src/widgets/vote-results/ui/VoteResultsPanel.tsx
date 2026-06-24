@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, Check, Crown } from "lucide-react";
-import { closeVote } from "@/features/vote-action";
+import { closeVote, decidePlace } from "@/features/vote-action";
 import type { VoteResults, VoteType } from "@/entities/vote";
 import { cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/ui/button";
@@ -22,6 +22,7 @@ interface Props {
   voteType: VoteType;
   results: VoteResults | null;
   isHost: boolean;
+  roomCode: string;
   meetingId: string | null;
   candidateName: (id: string) => string;
   /** 호스트가 확정에 성공했을 때 호출(부모가 후속 처리·이동). */
@@ -33,6 +34,7 @@ export function VoteResultsPanel({
   voteType,
   results,
   isHost,
+  roomCode,
   meetingId,
   candidateName,
   onResolved,
@@ -49,17 +51,29 @@ export function VoteResultsPanel({
     : 0;
 
   const finalize = async (finalCandidateId?: string) => {
-    if (!meetingId || isClosing) return;
+    if (isClosing) return;
+    if (!finalCandidateId) {
+      setError("확정할 후보를 찾지 못했어요. 후보를 선택해주세요.");
+      return;
+    }
     setIsClosing(true);
     setError(null);
     try {
-      const res = await closeVote({ meetingId, voteType, finalCandidateId });
-      if (res.resolved) {
-        onResolved(res.finalCandidateId);
-      } else if (res.reason === "TIE") {
-        setError("확정 직전 동률이 다시 발생했어요. 후보를 다시 선택해주세요.");
+      if (voteType === "PLACE") {
+        // PLACE는 close-vote(→LOCATION_DECIDED, 식당 추천 차단) 대신 장소만 기록한다.
+        await decidePlace({ code: roomCode, placeCandidateId: finalCandidateId });
+        onResolved(finalCandidateId);
       } else {
-        setError("아직 투표가 없어요.");
+        if (!meetingId) {
+          setError("모임 정보를 불러오지 못했어요. 새로고침 후 다시 시도해주세요.");
+          return;
+        }
+        const res = await closeVote({ meetingId, voteType, finalCandidateId });
+        if (res.resolved) {
+          onResolved(res.finalCandidateId);
+        } else {
+          setError("확정에 실패했어요. 다시 시도해주세요.");
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "확정에 실패했어요.");
@@ -205,7 +219,11 @@ export function VoteResultsPanel({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>취소</AlertDialogCancel>
-                <AlertDialogAction onClick={() => void finalize()}>확정하기</AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => void finalize(results.winnerId ?? undefined)}
+                >
+                  확정하기
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

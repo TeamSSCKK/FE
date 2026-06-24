@@ -35,6 +35,15 @@ interface SupabaseLocation {
   longitude: number;
 }
 
+interface SupabaseFinalPlace {
+  place_candidate_id: number;
+  place_name: string;
+  category: string | null;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+}
+
 interface SupabaseFinalRestaurant {
   restaurant_candidate_id: number;
   restaurant_name: string;
@@ -58,6 +67,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
     meeting: SupabaseMeeting;
     participants: SupabaseParticipant[];
     locations: SupabaseLocation[];
+    finalPlace: SupabaseFinalPlace | null;
     finalRestaurant: SupabaseFinalRestaurant | null;
   };
 
@@ -100,16 +110,27 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
 
   const host = members.find((m) => m.isHost);
 
-  const meetingLocation = (() => {
-    if (typeof window === "undefined") return undefined;
-    try {
-      const raw = localStorage.getItem(`room-${code}`);
-      if (!raw) return undefined;
-      return (JSON.parse(raw) as { meetingLocation?: Location }).meetingLocation;
-    } catch {
-      return undefined;
-    }
-  })();
+  // 확정 장소: 백엔드 final_decision(finalPlace)을 우선, 없으면 localStorage 폴백.
+  const fp = data.finalPlace;
+  const finalPlaceCandidateId = fp ? String(fp.place_candidate_id) : undefined;
+  const meetingLocation: Location | undefined = fp
+    ? {
+        label: fp.place_name,
+        roadAddress: fp.address ?? fp.category ?? fp.place_name,
+        lat: fp.latitude,
+        lng: fp.longitude,
+      }
+    : (() => {
+        if (typeof window === "undefined") return undefined;
+        try {
+          const raw = localStorage.getItem(`room-${code}`);
+          if (!raw) return undefined;
+          return (JSON.parse(raw) as { meetingLocation?: Location })
+            .meetingLocation;
+        } catch {
+          return undefined;
+        }
+      })();
 
   // 백엔드 final_decision 기반 확정 식당 매핑 (도보 분속 ~78m/분 근사)
   const fr = data.finalRestaurant;
@@ -140,6 +161,7 @@ export async function fetchRoomStatus(code: string): Promise<RoomStatus> {
       createdAt: data.meeting.created_at,
       status: data.meeting.status,
       meetingLocation,
+      finalPlaceCandidateId,
       selectedRestaurant,
     },
     members,

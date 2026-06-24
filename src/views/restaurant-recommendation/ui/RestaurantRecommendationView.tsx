@@ -56,6 +56,9 @@ export function RestaurantRecommendationView({ code }: Props) {
     }
   }, [code, role.roomStatus]);
 
+  // 확정 장소 id는 백엔드 final_decision 기반 값을 우선 사용한다(localStorage 폴백은 fetch 내부).
+  const finalPlaceCandidateId = role.roomStatus?.room.finalPlaceCandidateId;
+
   // 역할 해소(로딩 종료) 후에만 추천 fetch — 조기 발화 방지.
   useEffect(() => {
     if (role.isLoading) return;
@@ -63,7 +66,10 @@ export function RestaurantRecommendationView({ code }: Props) {
 
     (async () => {
       try {
-        const result = await fetchRestaurantRecommendation(code);
+        const result = await fetchRestaurantRecommendation(
+          code,
+          finalPlaceCandidateId,
+        );
         if (canceled) return;
         if (result.restaurants.length === 0) {
           setPhase("error");
@@ -84,7 +90,7 @@ export function RestaurantRecommendationView({ code }: Props) {
     return () => {
       canceled = true;
     };
-  }, [code, role.isLoading]);
+  }, [code, role.isLoading, finalPlaceCandidateId]);
 
   useEffect(() => {
     if (role.error) {
@@ -336,6 +342,7 @@ export function RestaurantRecommendationView({ code }: Props) {
           voteType="RESTAURANT"
           results={voteResults}
           isHost={role.isHost}
+          roomCode={code}
           meetingId={meetingId}
           candidateName={candidateName}
           onResolved={handleResolved}

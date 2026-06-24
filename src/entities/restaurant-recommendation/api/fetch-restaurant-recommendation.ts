@@ -25,11 +25,14 @@ interface BackendResult {
 
 export async function fetchRestaurantRecommendation(
   code: string,
+  placeCandidateIdArg?: string,
 ): Promise<RestaurantRecommendationResult> {
+  // 확정 장소 id는 백엔드(final_decision) 값을 우선, 없으면 localStorage 폴백.
   const placeCandidateId =
-    typeof window !== "undefined"
+    placeCandidateIdArg ||
+    (typeof window !== "undefined"
       ? (localStorage.getItem(`moyeo_place_${code}`) ?? "")
-      : "";
+      : "");
 
   const response = await apiClient.post<BackendResult>(
     "/functions/v1/recommend-restaurants",

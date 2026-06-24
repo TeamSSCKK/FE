@@ -20,8 +20,10 @@ export interface Room {
   createdAt: string;
   /** meeting.status (예: RECRUITING, PLACE_VOTING, RESTAURANT_VOTING, CLOSED) */
   status?: string;
-  /** 호스트가 큐레이션 단계에서 정한 모임 장소 (미설정 시 undefined) */
+  /** 확정된 모임 장소 (백엔드 final_decision 우선, 미설정 시 undefined) */
   meetingLocation?: Location;
+  /** 확정된 모임 장소의 place_candidate_id (식당 추천 입력값, 미확정 시 undefined) */
+  finalPlaceCandidateId?: string;
   /** 최종 확정된 모임 식당 (final_decision 기반, 미확정 시 undefined) */
   selectedRestaurant?: SelectedRestaurant;
 }

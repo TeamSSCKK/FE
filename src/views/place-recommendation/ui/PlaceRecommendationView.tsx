@@ -388,6 +388,7 @@ export function PlaceRecommendationView({ roomCode }: Props) {
               voteType="PLACE"
               results={voteResults}
               isHost={role.isHost}
+              roomCode={roomCode}
               meetingId={meetingId}
               candidateName={candidateName}
               onResolved={handleResolved}

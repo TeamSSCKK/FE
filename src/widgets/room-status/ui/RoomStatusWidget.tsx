@@ -300,8 +300,10 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
           )}
         </div>
 
-        {/* 투표 진행 중 — 모든 참가자(호스트·멤버) 진입점 */}
-        {(roomStatus.room.status === "PLACE_VOTING" ||
+        {/* 투표 진행 중 — 모든 참가자(호스트·멤버) 진입점.
+            장소가 이미 확정됐으면(finalPlaceCandidateId) PLACE 투표 배너는 숨긴다. */}
+        {((roomStatus.room.status === "PLACE_VOTING" &&
+          !roomStatus.room.finalPlaceCandidateId) ||
           roomStatus.room.status === "RESTAURANT_VOTING") && (
           <div className="animate-fade-up rounded-2xl border border-primary/20 bg-primary/[0.06] p-4">
             <p className="text-sm font-semibold text-gray-900">
