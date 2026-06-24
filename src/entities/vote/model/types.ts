@@ -14,4 +14,6 @@ export interface VoteResults {
   topCandidates: string[];
   finalized: boolean;
   finalCandidateId: string | null;
+  /** 요청에 participantId가 있을 때, 그 참가자가 현재 투표한 후보 id(없으면 null). */
+  myCandidateId: string | null;
 }

@@ -59,6 +59,7 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   const submitVote = useVoteActionStore((s) => s.submit);
   const submittedCandidateId = useVoteActionStore((s) => s.submittedCandidateId);
   const isSubmitting = useVoteActionStore((s) => s.isSubmitting);
+  const setSubmitted = useVoteActionStore((s) => s.setSubmitted);
 
   // 투표 현황 (폴링)
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
@@ -134,6 +135,16 @@ export function PlaceRecommendationView({ roomCode }: Props) {
     };
   }, [phase, refreshResults]);
 
+  // 서버가 알려준 내 투표(myCandidateId)로 "투표함" 하이라이트를 복원한다.
+  // 재방문/타기기 진입 시에도 유지. 제출 중에는 낙관적 상태를 덮지 않는다.
+  const myCandidateId = voteResults?.myCandidateId ?? null;
+  useEffect(() => {
+    if (isSubmitting) return;
+    if (myCandidateId != null && myCandidateId !== submittedCandidateId) {
+      setSubmitted(myCandidateId);
+    }
+  }, [myCandidateId, isSubmitting, submittedCandidateId, setSubmitted]);
+
   // 후보에 투표(재선택 시 변경 투표) 후 현황 즉시 갱신
   const handleVote = useCallback(
     (place: RecommendedPlace) => {
@@ -168,7 +179,8 @@ export function PlaceRecommendationView({ roomCode }: Props) {
   );
 
   const candidateName = useCallback(
-    (id: string) => result?.places.find((p) => p.id === id)?.name ?? id,
+    // 매칭 실패 시 원시 숫자 id 노출 방지(근본 해결은 후보 id 안정화). 방어선.
+    (id: string) => result?.places.find((p) => p.id === id)?.name ?? "(알 수 없음)",
     [result],
   );
 

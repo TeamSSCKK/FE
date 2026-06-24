@@ -112,6 +112,19 @@ export async function GET(
       : decisions[0]?.final_restaurant_candidate_id;
   const finalCandidateId = decidedId != null ? String(decidedId) : null;
 
+  // 내 투표(참가자 id가 주어진 경우) — 이미 집계한 latestByParticipant 재사용.
+  const myPid = req.nextUrl.searchParams.get("participantId");
+  let myCandidateId: string | null = null;
+  if (myPid) {
+    const mine = latestByParticipant.get(Number(myPid));
+    const id = mine
+      ? voteType === "PLACE"
+        ? mine.place_candidate_id
+        : mine.restaurant_candidate_id
+      : null;
+    myCandidateId = id != null ? String(id) : null;
+  }
+
   return NextResponse.json({
     voteType,
     tally,
@@ -120,5 +133,6 @@ export async function GET(
     topCandidates: top,
     finalized: finalCandidateId != null,
     finalCandidateId,
+    myCandidateId,
   });
 }

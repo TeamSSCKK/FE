@@ -8,6 +8,7 @@ import { useVoteActionStore } from "@/features/vote-action";
 import { fetchVoteResults, type VoteResults } from "@/entities/vote";
 import { VoteResultsPanel } from "@/widgets/vote-results";
 import { fetchRestaurantRecommendation } from "@/entities/restaurant-recommendation/api/fetch-restaurant-recommendation";
+import { fetchRestaurantCandidates } from "@/entities/restaurant-recommendation/api/fetch-restaurant-candidates";
 import type {
   ConfirmedPlace,
   RecommendedRestaurant,
@@ -18,11 +19,16 @@ import { cn } from "@/shared/lib/utils";
 
 interface Props {
   code: string;
+  /**
+   * generate: 호스트 큐레이션 경로 — 추천을 생성한다(recommend-restaurants).
+   * vote: 투표 화면 — 저장된 후보만 읽는다(생성 트리거 없음). 기본값.
+   */
+  mode?: "generate" | "vote";
 }
 
 type Phase = "loading" | "success" | "error";
 
-export function RestaurantRecommendationView({ code }: Props) {
+export function RestaurantRecommendationView({ code, mode = "vote" }: Props) {
   const router = useRouter();
   const role = useRoomRole(code);
   const [phase, setPhase] = useState<Phase>("loading");
@@ -38,6 +44,7 @@ export function RestaurantRecommendationView({ code }: Props) {
   const submitVote = useVoteActionStore((s) => s.submit);
   const submittedCandidateId = useVoteActionStore((s) => s.submittedCandidateId);
   const isSubmitting = useVoteActionStore((s) => s.isSubmitting);
+  const setSubmitted = useVoteActionStore((s) => s.setSubmitted);
 
   const [voteResults, setVoteResults] = useState<VoteResults | null>(null);
   const [pollFinalized, setPollFinalized] = useState(false);
@@ -59,17 +66,20 @@ export function RestaurantRecommendationView({ code }: Props) {
   // 확정 장소 id는 백엔드 final_decision 기반 값을 우선 사용한다(localStorage 폴백은 fetch 내부).
   const finalPlaceCandidateId = role.roomStatus?.room.finalPlaceCandidateId;
 
-  // 역할 해소(로딩 종료) 후에만 추천 fetch — 조기 발화 방지.
+  // 역할 해소(로딩 종료) 후에만 fetch — 조기 발화 방지.
+  // vote 모드: 저장된 후보만 읽는다(생성 안 함). generate 모드: 추천을 생성한다.
   useEffect(() => {
     if (role.isLoading) return;
+    // vote 모드는 확정 장소 id가 있어야 후보를 읽을 수 있다. 아직이면 대기(도착 시 재실행).
+    if (mode === "vote" && !finalPlaceCandidateId) return;
     let canceled = false;
 
     (async () => {
       try {
-        const result = await fetchRestaurantRecommendation(
-          code,
-          finalPlaceCandidateId,
-        );
+        const result =
+          mode === "vote"
+            ? await fetchRestaurantCandidates(code, finalPlaceCandidateId ?? "")
+            : await fetchRestaurantRecommendation(code, finalPlaceCandidateId);
         if (canceled) return;
         if (result.restaurants.length === 0) {
           setPhase("error");
@@ -90,7 +100,7 @@ export function RestaurantRecommendationView({ code }: Props) {
     return () => {
       canceled = true;
     };
-  }, [code, role.isLoading, finalPlaceCandidateId]);
+  }, [code, role.isLoading, finalPlaceCandidateId, mode]);
 
   useEffect(() => {
     if (role.error) {
@@ -129,11 +139,22 @@ export function RestaurantRecommendationView({ code }: Props) {
     };
   }, [phase, refreshResults, pollFinalized]);
 
+  // 서버가 알려준 내 투표(myCandidateId)로 "투표함" 하이라이트를 복원한다.
+  // 재방문/타기기 진입 시에도 유지. 제출 중에는 낙관적 상태를 덮지 않는다.
+  const myCandidateId = voteResults?.myCandidateId ?? null;
+  useEffect(() => {
+    if (isSubmitting) return;
+    if (myCandidateId != null && myCandidateId !== submittedCandidateId) {
+      setSubmitted(myCandidateId);
+    }
+  }, [myCandidateId, isSubmitting, submittedCandidateId, setSubmitted]);
+
   const totalCount = restaurants.length;
   const current = useMemo(() => restaurants[activeIndex], [restaurants, activeIndex]);
 
   const candidateName = useCallback(
-    (id: string) => restaurants.find((r) => r.id === id)?.name ?? id,
+    // 매칭 실패 시 원시 숫자 id 노출 방지(근본 해결은 후보 id 안정화). 방어선.
+    (id: string) => restaurants.find((r) => r.id === id)?.name ?? "(알 수 없음)",
     [restaurants],
   );
 

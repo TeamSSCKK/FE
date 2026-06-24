@@ -14,6 +14,8 @@ interface VoteActionState {
   init: (voteType: VoteType) => void;
   select: (candidateId: string) => void;
   submit: (roomCode: string) => Promise<void>;
+  /** 서버에서 복원한 내 투표를 반영한다(재방문/타기기 투표 하이라이트 복원용). */
+  setSubmitted: (candidateId: string | null) => void;
   reset: () => void;
 }
 
@@ -28,6 +30,8 @@ export const useVoteActionStore = create<VoteActionState>((set, get) => ({
     set({ voteType, selectedCandidateId: null, submittedCandidateId: null, error: null }),
 
   select: (candidateId) => set({ selectedCandidateId: candidateId }),
+
+  setSubmitted: (candidateId) => set({ submittedCandidateId: candidateId }),
 
   submit: async (roomCode: string) => {
     const { selectedCandidateId, isSubmitting, voteType } = get();

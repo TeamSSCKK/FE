@@ -18,32 +18,19 @@ interface BackendRestaurant {
   sourceUrl?: string;
 }
 
-interface BackendResult {
+export interface BackendResult {
   place?: { id: string; name: string; lat: number; lng: number };
   restaurants: BackendRestaurant[];
 }
 
-export async function fetchRestaurantRecommendation(
-  code: string,
-  placeCandidateIdArg?: string,
-): Promise<RestaurantRecommendationResult> {
-  // 확정 장소 id는 백엔드(final_decision) 값을 우선, 없으면 localStorage 폴백.
-  const placeCandidateId =
-    placeCandidateIdArg ||
-    (typeof window !== "undefined"
-      ? (localStorage.getItem(`moyeo_place_${code}`) ?? "")
-      : "");
-
-  const response = await apiClient.post<BackendResult>(
-    "/functions/v1/recommend-restaurants",
-    {
-      inviteCode: code,
-      placeCandidateId: placeCandidateId ? Number(placeCandidateId) : undefined,
-      limit: 5,
-    },
-  );
-
-  const { place, restaurants } = response.data;
+/**
+ * 백엔드 식당 응답(recommend-restaurants / restaurant-candidates 라우트 공통 형태)을
+ * 화면용 모델로 변환한다. 생성·읽기 전용 두 경로가 동일 매핑을 공유한다.
+ */
+export function mapBackendResult(
+  data: BackendResult,
+): RestaurantRecommendationResult {
+  const { place, restaurants } = data;
 
   const mapped: RecommendedRestaurant[] = restaurants.map((r) => ({
     id: r.id,
@@ -67,4 +54,27 @@ export async function fetchRestaurantRecommendation(
   }));
 
   return { place, restaurants: mapped };
+}
+
+export async function fetchRestaurantRecommendation(
+  code: string,
+  placeCandidateIdArg?: string,
+): Promise<RestaurantRecommendationResult> {
+  // 확정 장소 id는 백엔드(final_decision) 값을 우선, 없으면 localStorage 폴백.
+  const placeCandidateId =
+    placeCandidateIdArg ||
+    (typeof window !== "undefined"
+      ? (localStorage.getItem(`moyeo_place_${code}`) ?? "")
+      : "");
+
+  const response = await apiClient.post<BackendResult>(
+    "/functions/v1/recommend-restaurants",
+    {
+      inviteCode: code,
+      placeCandidateId: placeCandidateId ? Number(placeCandidateId) : undefined,
+      limit: 5,
+    },
+  );
+
+  return mapBackendResult(response.data);
 }
