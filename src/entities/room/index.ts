@@ -13,6 +13,7 @@ export {
   removeJoinedCode,
 } from "./lib/joined-rooms-storage";
 export { useHostGuard } from "./lib/use-host-guard";
+export { useRoomRole } from "./lib/use-room-role";
 export type {
   Room,
   RoomCode,

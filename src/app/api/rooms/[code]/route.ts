@@ -55,16 +55,31 @@ export async function GET(
     if (locRes.ok) locations = (await locRes.json()) as unknown[];
   }
 
-  // 최종 확정 식당: final_decision → restaurant_candidate 조인 조회
+  // 최종 확정 장소/식당: final_decision → place_candidate / restaurant_candidate 조인 조회
+  let finalPlace: unknown = null;
   let finalRestaurant: unknown = null;
   const decisionRes = await fetch(
-    `${supabaseUrl}/rest/v1/final_decision?meeting_id=eq.${meeting.meeting_id}&select=final_restaurant_candidate_id`,
+    `${supabaseUrl}/rest/v1/final_decision?meeting_id=eq.${meeting.meeting_id}&select=final_place_candidate_id,final_restaurant_candidate_id`,
     { headers: supabaseHeaders(), cache: "no-store" },
   );
   if (decisionRes.ok) {
     const decisions = (await decisionRes.json()) as {
+      final_place_candidate_id: number | null;
       final_restaurant_candidate_id: number | null;
     }[];
+
+    const placeId = decisions[0]?.final_place_candidate_id;
+    if (placeId) {
+      const placeRes = await fetch(
+        `${supabaseUrl}/rest/v1/place_candidate?place_candidate_id=eq.${placeId}&select=place_candidate_id,place_name,category,address,latitude,longitude`,
+        { headers: supabaseHeaders(), cache: "no-store" },
+      );
+      if (placeRes.ok) {
+        const rows = (await placeRes.json()) as unknown[];
+        finalPlace = rows[0] ?? null;
+      }
+    }
+
     const restaurantId = decisions[0]?.final_restaurant_candidate_id;
     if (restaurantId) {
       const restRes = await fetch(
@@ -78,5 +93,11 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ meeting, participants, locations, finalRestaurant });
+  return NextResponse.json({
+    meeting,
+    participants,
+    locations,
+    finalPlace,
+    finalRestaurant,
+  });
 }

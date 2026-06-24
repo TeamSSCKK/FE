@@ -1,28 +1,36 @@
 import { create } from "zustand";
 import { castVote } from "../api/cast-vote";
+import type { VoteType } from "@/entities/vote";
 import { loadSessionData } from "@/shared/lib/room-session";
 
 interface VoteActionState {
+  voteType: VoteType;
   selectedCandidateId: string | null;
+  /** 서버에 제출된(반영된) 내 투표 — 변경 투표 구분용 */
+  submittedCandidateId: string | null;
   isSubmitting: boolean;
-  hasVoted: boolean;
   error: string | null;
 
+  init: (voteType: VoteType) => void;
   select: (candidateId: string) => void;
   submit: (roomCode: string) => Promise<void>;
   reset: () => void;
 }
 
 export const useVoteActionStore = create<VoteActionState>((set, get) => ({
+  voteType: "PLACE",
   selectedCandidateId: null,
+  submittedCandidateId: null,
   isSubmitting: false,
-  hasVoted: false,
   error: null,
+
+  init: (voteType) =>
+    set({ voteType, selectedCandidateId: null, submittedCandidateId: null, error: null }),
 
   select: (candidateId) => set({ selectedCandidateId: candidateId }),
 
   submit: async (roomCode: string) => {
-    const { selectedCandidateId, isSubmitting } = get();
+    const { selectedCandidateId, isSubmitting, voteType } = get();
     if (!selectedCandidateId || isSubmitting) return;
 
     const session = loadSessionData(roomCode);
@@ -37,9 +45,9 @@ export const useVoteActionStore = create<VoteActionState>((set, get) => ({
         meetingId: session.meetingId,
         participantId: session.participantId,
         candidateId: selectedCandidateId,
-        voteType: "PLACE",
+        voteType,
       });
-      set({ hasVoted: true, isSubmitting: false });
+      set({ submittedCandidateId: selectedCandidateId, isSubmitting: false });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "투표에 실패했어요.";
       set({ isSubmitting: false, error: msg });
@@ -49,8 +57,8 @@ export const useVoteActionStore = create<VoteActionState>((set, get) => ({
   reset: () =>
     set({
       selectedCandidateId: null,
+      submittedCandidateId: null,
       isSubmitting: false,
-      hasVoted: false,
       error: null,
     }),
 }));
