@@ -166,6 +166,12 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
     [roomStatus],
   );
 
+  // 장소 추천은 출발 위치를 입력한 참가자가 최소 2명 필요하다(백엔드 INSUFFICIENT_PARTICIPANTS와 동일 기준).
+  const canStartCuration = useMemo(
+    () => !!roomStatus && roomStatus.locationInputCount >= 2,
+    [roomStatus],
+  );
+
   const handleJoinSuccess = (memberId: string) => {
     // saveSessionData는 joinRoom API 내부에서 호출됨
     setLocalMemberId(memberId);
@@ -459,10 +465,16 @@ export function RoomStatusWidget({ roomCode, currentMemberId }: Props) {
         <div className="sticky bottom-0 z-10 border-t border-border/40 bg-white px-5 pb-6 pt-3">
           <Button
             onClick={() => router.push(`/rooms/${roomCode}/curation`)}
-            className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95"
+            disabled={!canStartCuration}
+            className="h-12 w-full rounded-2xl text-sm font-semibold active:scale-[0.97] active:opacity-95 disabled:opacity-50"
           >
             큐레이션 시작하기
           </Button>
+          {!canStartCuration && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              출발 위치를 입력한 참가자가 2명 이상이면 시작할 수 있어요.
+            </p>
+          )}
         </div>
       )}
     </div>
