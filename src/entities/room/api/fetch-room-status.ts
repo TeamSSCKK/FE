@@ -198,6 +198,9 @@ export async function joinRoom(params: {
       if (status === 409) {
         throw new Error("지금은 참여할 수 없는 모임이에요.");
       }
+      if (status === 410) {
+        throw new Error("초대 링크가 만료되었어요.");
+      }
       if (status === 404) {
         throw new Error("모임을 찾을 수 없어요. 링크를 다시 확인해주세요.");
       }
